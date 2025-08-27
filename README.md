@@ -1,166 +1,114 @@
-# MERN Stack Application
+# YesChef - Food AI Recipe App
 
-A full-stack web application built with MongoDB, Express.js, React, and Node.js.
+A modern React-based food recipe application with AI-powered ingredient management and store locator functionality.
+
+## Features
+
+- **Interactive Ingredient Lists**: Check off ingredients with custom styled checkboxes
+- **Segmented Controls**: Smooth animated toggle between Ingredients and Directions
+- **Store Locator Modal**: Find nearby stores with phone contact and distance information
+- **Responsive Design**: Mobile-first responsive UI
+- **Modern Animations**: Smooth modal transitions with custom bezier curves
+- **Component-Based Architecture**: Reusable React components
+
+## Tech Stack
+
+### Frontend
+- **React 19.1.1**: Modern React with hooks
+- **CSS3**: Custom animations and responsive design
+- **Component Architecture**: Modular, reusable components
 
 ## Project Structure
 
 ```
-mern-app/
-│
-├── backend/                 # Node.js/Express backend
-│   ├── config/              # Database and environment configuration
-│   ├── controllers/         # Route controllers
-│   ├── models/              # Database models
-│   ├── routes/              # API routes
-│   ├── middleware/          # Custom middleware
-│   ├── utils/               # Utility functions
-│   ├── server.js           # Main server file
-│   └── package.json
-│
-├── frontend/                # React frontend
-│   ├── public/             # Public assets
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/          # Page components
-│   │   ├── context/        # React context
-│   │   ├── services/       # API services
-│   │   ├── utils/          # Utility functions
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   └── package.json
-│
-├── .env                    # Environment variables
-├── .gitignore
-└── README.md
+food-ai/
+├── public/
+│   ├── index.html
+│   └── assets/
+├── src/
+│   ├── components/
+│   │   ├── Button.jsx          # Flexible button component
+│   │   ├── Footer.jsx          # App footer with action buttons
+│   │   ├── Ingredients.jsx     # Interactive ingredient list
+│   │   ├── Navbar.jsx          # Navigation bar
+│   │   └── Stores.jsx          # Store locator modal
+│   ├── pages/
+│   │   ├── Home.jsx            # Landing page
+│   │   ├── FoodInformation.jsx # Main food info page
+│   │   └── FoodOverview.jsx    # Food overview page
+│   ├── styles/
+│   │   ├── Home.css
+│   │   ├── FoodInfo.css        # Main styles with modal animations
+│   │   └── Stores.css          # Store component styles
+│   └── index.js
+└── package.json
 ```
 
-## Features
+## Key Components
 
-- **Authentication**: JWT-based user authentication
-- **User Management**: User registration, login, and profile management
-- **Responsive Design**: Mobile-first responsive UI with Tailwind CSS
-- **API Integration**: Axios for HTTP requests
-- **Context API**: Global state management
-- **Error Handling**: Comprehensive error handling on both frontend and backend
-- **Security**: Helmet.js for security headers, bcrypt for password hashing
+### Store Modal
+- Slide-in animation from bottom (150ms)
+- 4 sample UK stores with contact info
+- Click outside to close
+- Smooth bezier curve animations
 
-## Tech Stack
+### Interactive Ingredients
+- Custom checkbox styling with SVG checkmarks
+- Hover effects and transitions
+- Dynamic quantity and unit display
+- Component-based rendering
 
-### Backend
-- **Node.js**: JavaScript runtime
-- **Express.js**: Web application framework
-- **MongoDB**: NoSQL database
-- **Mongoose**: MongoDB object modeling
-- **JWT**: JSON Web Tokens for authentication
-- **bcryptjs**: Password hashing
-- **Helmet**: Security middleware
-- **CORS**: Cross-origin resource sharing
-
-### Frontend
-- **React**: JavaScript library for building user interfaces
-- **Vite**: Build tool and development server
-- **React Router**: Declarative routing
-- **Axios**: HTTP client
-- **Tailwind CSS**: Utility-first CSS framework
-- **Context API**: State management
+### Segmented Controls
+- Smooth sliding background animation
+- Toggle between Ingredients/Directions
+- CSS-based state management
 
 ## Getting Started
 
 ### Prerequisites
-
 - Node.js (v14 or higher)
-- MongoDB (local installation or MongoDB Atlas)
 - npm or yarn
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd mern-app
+   git clone https://github.com/jehtoms/YesChef.git
+   cd YesChef
    ```
 
-2. **Install backend dependencies**
+2. **Install dependencies**
    ```bash
-   cd backend
+   cd food-ai
    npm install
    ```
 
-3. **Install frontend dependencies**
+3. **Start the development server**
    ```bash
-   cd ../frontend
-   npm install
+   npm start
    ```
-
-4. **Environment Configuration**
-   - Copy the `.env` file and update the values:
-   ```
-   NODE_ENV=development
-   MONGO_URI=mongodb://localhost:27017/mern-app
-   JWT_SECRET=your_jwt_secret_key_here
-   JWT_EXPIRE=30d
-   PORT=5000
-   CLIENT_URL=http://localhost:3000
-   ```
-
-5. **Start MongoDB**
-   - Make sure MongoDB is running on your system
-
-### Running the Application
-
-1. **Start the backend server**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-   The backend will run on `http://localhost:5000`
-
-2. **Start the frontend development server**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   The frontend will run on `http://localhost:3000`
-
-## API Endpoints
-
-### Authentication
-- `POST /api/users/register` - Register a new user
-- `POST /api/users/login` - Login user
-- `GET /api/users/profile` - Get user profile (Protected)
-- `PUT /api/users/profile` - Update user profile (Protected)
+   The app will run on `http://localhost:3001`
 
 ## Scripts
 
-### Backend
-- `npm start` - Start production server
-- `npm run dev` - Start development server with nodemon
-
-### Frontend
-- `npm run dev` - Start development server
+- `npm start` - Start development server
 - `npm run build` - Build for production
-- `npm run preview` - Preview production build
+- `npm test` - Run tests
+- `npm run eject` - Eject from Create React App
 
-## Project Features
+## Features in Detail
 
-### Authentication System
-- User registration and login
-- JWT token-based authentication
-- Password hashing with bcrypt
-- Protected routes
+### Modal System
+- **Overlay**: 25% black background with fade animations
+- **Content**: Centered modal with slide transitions
+- **Interactions**: Close via X button or outside clicks
+- **Timing**: Synchronized 150ms animations
 
-### User Interface
-- Modern, responsive design
-- Clean and intuitive navigation
-- Loading states and error handling
-- Mobile-first approach
-
-### Security Features
-- Input validation
-- Password hashing
-- JWT token security
-- CORS configuration
-- Security headers with Helmet
+### Store Data
+- **Sainsbury's Local**: 0.1 miles - 0333 123 4567
+- **Tesco Express**: 0.3 miles - 0345 167 7890
+- **ASDA Superstore**: 0.5 miles - 0800 123 4567
+- **Morrisons**: 0.7 miles - 0870 111 2234
 
 ## Contributing
 
@@ -172,8 +120,4 @@ mern-app/
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support, email your-email@example.com or create an issue in the repository.
+This project is licensed under the MIT License.
