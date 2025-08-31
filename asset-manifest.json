@@ -1,15 +1,16 @@
 {
   "files": {
-    "main.css": "/YesChef/static/css/main.03676e49.css",
-    "main.js": "/YesChef/static/js/main.f81bc6aa.js",
+    "main.css": "/YesChef/static/css/main.5883fa4b.css",
+    "main.js": "/YesChef/static/js/main.34d9c0a3.js",
     "static/js/453.52cf7b0c.chunk.js": "/YesChef/static/js/453.52cf7b0c.chunk.js",
+    "static/media/alarm-clock-short-6402.mp3": "/YesChef/static/media/alarm-clock-short-6402.e79e0abb7c74667ec9d7.mp3",
     "index.html": "/YesChef/index.html",
-    "main.03676e49.css.map": "/YesChef/static/css/main.03676e49.css.map",
-    "main.f81bc6aa.js.map": "/YesChef/static/js/main.f81bc6aa.js.map",
+    "main.5883fa4b.css.map": "/YesChef/static/css/main.5883fa4b.css.map",
+    "main.34d9c0a3.js.map": "/YesChef/static/js/main.34d9c0a3.js.map",
     "453.52cf7b0c.chunk.js.map": "/YesChef/static/js/453.52cf7b0c.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.03676e49.css",
-    "static/js/main.f81bc6aa.js"
+    "static/css/main.5883fa4b.css",
+    "static/js/main.34d9c0a3.js"
   ]
 }
