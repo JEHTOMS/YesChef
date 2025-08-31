@@ -3,6 +3,12 @@
 width: 100%;
 flex-direction: column;
 align-items: center;
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+z-index: 1000;
+background: #FFF;
 }
 
 .tab-bar {
@@ -284,4 +290,18 @@ input[type="checkbox"]:hover {
   to {
     opacity: 0;
   }
+}
+
+
+
+
+/* If Directions renders its own .main-content wrapper, prevent double stretching */
+.food-info-page .main-content .main-content {
+  height: auto;
+  padding-bottom: 0; /* inner containers should not add extra footer space */
+}
+
+/* Extra-safe spacing on pages with segmented controls header inside FoodInformation */
+.food-info-page .main-content.with-segmented-controls {
+  padding-top: 220px; /* account for navbar + segmented controls stack */
 }

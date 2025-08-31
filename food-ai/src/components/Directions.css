@@ -1,0 +1,182 @@
+.directions {
+    width: 100vw;
+    height: 100svh; /* fill viewport minus footer height (105px) */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* If the page adds large top padding for segmented controls, pull the Directions container up
+   so its slides sit under the fixed header instead of being pushed down. This keeps other pages
+   (like Ingredients) unaffected. */
+.directions-container {
+    margin-top: -210px; /* visual offset to counter the page's 220px top padding for this component */
+}
+
+.directions-swiper { height: 100%; width: 100%; }
+
+.direction-slide {
+    height: auto !important;
+    display: flex; /* ensure slides use flex so .steps can be centered */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Give each slide top and bottom margin so spacing is symmetric (16px top + 16px bottom = 32px) */
+.direction-slide {
+    margin: 16px 0;
+}
+
+/* Make Swiper's slides use flex layout as well (covers default class names) */
+.directions .swiper-slide {
+    /* make selector more specific and force it to override Swiper's default stylesheet */
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.steps{
+    display: flex;
+    height: 55svh;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: center;
+    border-radius: 24px;
+    background: #FFF;
+    max-width: 640px; /* cap step width per request */
+    box-sizing: border-box;
+}
+
+.step-header{
+    display: flex;
+padding: 16px;
+flex-direction: column;
+justify-content: center;
+align-items: flex-start;
+gap: 8px;
+border-radius: 24px 24px 0px 0px;
+align-self: stretch;
+border-bottom: 0.5px solid rgba(0, 0, 0, 0.30);
+}
+
+.step-link{
+    text-decoration: none;
+    color: #000000;
+    display: flex;
+padding: 4px;
+justify-content: center;
+align-items: center;
+gap: 4px;
+border-radius: 8px;
+background: rgba(58, 58, 58, 0.06);
+width: auto;
+}
+
+.step-ingredients{
+    display: flex;
+align-items: flex-start;
+gap: 8px;
+list-style: none;
+ padding: 0;
+    margin: 0;
+}
+
+.step-ingredients li{
+    display: flex;
+padding: 2px 4px 4px 4px;
+justify-content: center;
+align-items: center;
+border-radius: 6px;
+background: rgba(58, 58, 58, 0.06);
+}
+
+.step-content{
+    padding: 16px;
+    text-align: left;
+}
+
+.heat-medium{
+    --heat-color: #EA8958;
+    color: #000000;
+}
+
+.heat-low{
+    --heat-color: #3E75EB;
+    color: #000000;
+}
+
+.heat-high{
+    --heat-color: #EB3E47;
+    color: #000000;
+}
+
+/* shimmer: left-to-right sliding highlight using the heat color; text returns to normal after animation */
+.shimmer {
+    display: inline-block;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: linear-gradient(90deg, rgba(0,0,0,0) 0%, var(--heat-color, #000) 50%, rgba(0,0,0,0) 100%);
+    background-size: 200% 100%;
+    background-position: 100% 0; /* start on the right */
+    animation: shimmer-slide 1s linear 0s 1; /* run once */
+}
+
+@keyframes shimmer-slide {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+.timer{
+   display: inline-block;
+   padding: 0px 4px 2px 4px;
+    border-radius: 6px;
+    background: rgba(43, 196, 49, 0.15);
+    color: #27992C;
+    transition: background 120ms ease;
+}
+
+.time{
+    cursor: pointer;
+}
+
+/* Hover shows a slightly stronger green background */
+.timer:hover {
+    background: rgba(43, 196, 49, 0.25);
+}
+
+/* Active/clicked state (mouse down) shows the strongest background; also support a `.clicked` utility class */
+.timer:active,
+.timer.clicked {
+    background: rgba(43, 196, 49, 0.45);
+}
+
+/* Keyboard focus for accessibility */
+.timer:focus-visible {
+    outline: 2px solid rgba(43, 196, 49, 0.45);
+    outline-offset: 2px;
+}
+
+.minutes-text{
+    margin-left: 4px;
+}
+
+.disabled-step{
+   background: rgba(58, 58, 58, 0.06);
+   color: #00000066 !important;
+}
+
+.disabled-step .heat-medium{
+    color: #00000066 !important;
+    background: rgba(58, 58, 58, 0.00);
+}
+
+.disabled-step .heat-low{
+    color: #00000066 !important;
+    background: rgba(58, 58, 58, 0.00);
+}
+
+.disabled-step .heat-high{
+    color: #00000066 !important;
+    background: rgba(58, 58, 58, 0.00);
+}

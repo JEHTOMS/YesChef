@@ -1,0 +1,154 @@
+
+
+.step-item{
+    display: flex;
+    justify-content: start;
+    min-height: 48px;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 0px;
+    position: relative;
+    cursor: pointer;
+    border-radius: 12px;
+}
+
+.step-type {
+
+    text-overflow: ellipsis;
+    width: 100%;
+    display: -webkit-box;
+-webkit-box-orient: vertical;
+-webkit-line-clamp: 1;
+    line-clamp: 1;
+flex: 1 0 0;
+overflow: hidden;
+text-align: left;
+}
+
+.step-list{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 8px;
+    margin: 0;
+    list-style: none;
+    border-radius: 16px;
+    background: #FFF;   
+}
+
+  .step-item {
+        padding: 8px 8px;
+        background: transparent;
+    }
+
+    .step-item:hover {
+        background-color: rgba(196, 196, 196, 0.15);
+    }
+
+    .step-item:hover::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 8px 16px;
+        border-radius: 12px;
+        pointer-events: none;
+    }
+
+    /* Active step styling */
+    .step-item.active-step {
+        background: #F04DCC;
+        color: #FFFFFF;
+    }
+
+    /* Ensure the step-number (circle) shows white text on active */
+    .step-number-active {
+        background: rgba(217, 217, 217, 0.28) !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Past steps retain a subtle filled style to indicate completed */
+    .step-item.past-step {
+        background: rgba(240, 77, 204, 0.08);
+        color: #000000;
+    }
+
+    /* Future steps (not yet reached) show disabled look */
+    .step-item.future-step {
+        /* mirror Directions .disabled-step */
+        background: rgba(58, 58, 58, 0.06);
+        color: #00000066;
+    }
+
+    /* Collapsed layout styles */
+    .step-list.collapsed{
+        flex-direction: row;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 24px;
+        align-items: center;
+        cursor: pointer;
+        transition: all 220ms cubic-bezier(.2,.9,.2,1);
+    }
+
+    .step-list.collapsed .step-item{
+        height: 12px;
+        border-radius: 4px;
+        padding: 0;
+        margin: 0;
+        display: block;
+        flex: 1 0 0; /* make each step equal width and fill container */
+        min-width: 0;
+        transition: all 280ms cubic-bezier(.2,.9,.2,1);
+        position: relative;
+        background: rgba(0,0,0,0.06);
+        cursor: pointer;
+    }
+
+    /* remove min-height when collapsed so the 12px height can take effect */
+    .step-list.collapsed .step-item{
+        min-height: 0;
+        align-items: stretch;
+    }
+
+    /* hide the header and remove container padding in collapsed view */
+    .store-container.collapsed .store-header{
+        display: none;
+    }
+
+    .store-container.collapsed{
+        padding: 0;
+    }
+
+    /* subtle elevation for the steps container */
+    .store-container {
+        box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.10);
+    }
+
+    /* remove horizontal padding from inner wrapper when collapsed so bars span wider */
+    .store-container.collapsed .store-wrapper{
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .step-list.collapsed .step-number,
+    .step-list.collapsed .step-type{
+        display: none; /* hide number and text in collapsed mode */
+    }
+
+    .step-list.collapsed .step-item.active-step,
+    .step-list.collapsed .step-item.past-step{
+        background: #F04DCC;
+    }
+
+    .step-list.collapsed .step-item.active-step{
+        box-shadow: 0 0 0 2px rgba(240,77,204,0.08) inset;
+    }
+
+    /* Expand animation: when switching from collapsed to expanded, animate heights */
+    .step-list.expanded .step-item{
+        transition: all 300ms cubic-bezier(.2,.9,.2,1);
+    }

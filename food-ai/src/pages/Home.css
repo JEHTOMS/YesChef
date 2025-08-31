@@ -32,10 +32,18 @@ width: 100%;
 
 .main-content {
   width: 100%;
-    display: flex;
-    justify-content: center;
-    height: 100%;
-    padding-bottom: 56px;
+  display: flex;
+  justify-content: center;
+  height: 100%;
+  /* default: only navbar height; override on pages with larger headers */
+  padding-top: 0;
+  /* leave enough room for fixed footer (approx ~112px incl. borders) */
+  padding-bottom: 128px;
+}
+
+/* Specific padding for pages with segmented controls */
+.main-content.with-segmented-controls {
+  padding-top: 120px;
 }
 
 .description{
