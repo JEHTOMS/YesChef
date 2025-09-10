@@ -305,3 +305,95 @@ input[type="checkbox"]:hover {
 .food-info-page .main-content.with-segmented-controls {
   padding-top: 220px; /* account for navbar + segmented controls stack */
 }
+
+.ingredient-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    align-self: stretch;
+}
+
+.ingredient-title {
+    display: flex;
+justify-content: space-between;
+align-items: center;
+align-self: stretch;
+}
+
+.ingredient-text {
+    display: flex;
+flex-direction: column;
+align-items: flex-start;
+gap: 4px;
+}
+
+.ingredient-heading {
+    font-family: "Shippori Antique B1", sans-serif;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 124%; /* 24.8px */
+letter-spacing: -0.6px;
+    color: #000000;
+}
+.ingredient-subheading {
+    font-family: "Shippori Antique B1", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: #737373;
+    max-width: 480px;
+    line-height: 140%; /* 19.6px */
+letter-spacing: -0.42px;
+    text-align: left;
+}
+
+.ingredient-select-button {
+    display: flex;
+    padding: 8px;
+    justify-content: center;
+    align-items: center;
+    border: 0px solid #ffffff;
+    color:#000000;
+    font-family: "Shippori Antique B1", sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 124%; /* 19.84px */
+letter-spacing: -0.48px;
+    text-decoration-line: underline;
+text-decoration-style: solid;
+text-decoration-skip-ink: auto;
+text-decoration-thickness: auto;
+text-underline-offset: auto;
+text-underline-position: from-font;
+text-wrap: nowrap;
+text-align: center;
+
+    cursor: pointer;
+}
+
+/* Bottom toast for copy confirmation */
+.bottom-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px; /* above footer buttons */
+  transform: translateX(-50%);
+  background: #121212;
+  color: #FFF;
+  padding: 12px 20px;
+  border-radius: 24px;
+  font-family: "Shippori Antique B1", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  animation: toastIn 200ms ease-out, toastOut 300ms ease-in 2.2s forwards;
+  z-index: 1200;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translate(-50%, 8px); }
+}

@@ -1,4 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useRecipe } from '../context/RecipeContext';
+import { LocationService } from '../services/locationService';
 import './Home.css';
 import '../index.css';
 import Navbar from "../components/Navbar";
@@ -10,19 +12,65 @@ import Directions from "../components/Directions";
 import Steps from "../components/Steps";
 
 function FoodInformation() {
+    const { recipeData, getServingMultiplier, getDisplayName, getVideoDuration } = useRecipe();
     const [activeTab, setActiveTab] = useState('ingredients');
     const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
     const [isModalClosing, setIsModalClosing] = useState(false);
+    const [stores, setStores] = useState([]);
+    const [storesLoading, setStoresLoading] = useState(false);
+    const [storesError, setStoresError] = useState(null);
     const directionsRef = useRef(null);
+    const ingredientsRef = useRef(null);
     const [activeDirectionIndex, setActiveDirectionIndex] = useState(0);
+    const [allSelected, setAllSelected] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+    const toastTimerRef = useRef(null);
+    
+    // Get serving multiplier from context
+    const servingMultiplier = getServingMultiplier();
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
     };
 
-    const openStoresModal = () => {
+    const openStoresModal = async () => {
         setIsStoresModalOpen(true);
         setIsModalClosing(false);
+        setStoresLoading(true);
+        setStoresError(null);
+        
+        try {
+            // Get current ingredients state from the Ingredients component
+            let currentIngredients = [];
+            if (ingredientsRef.current && ingredientsRef.current.getCurrentIngredients) {
+                currentIngredients = ingredientsRef.current.getCurrentIngredients();
+            } else {
+                // Fallback to transforming from recipe data
+                currentIngredients = transformIngredients(recipeData?.ingredients || []);
+            }
+            
+            const selectedIngredients = currentIngredients
+                .filter(ingredient => ingredient.checked)
+                .map(ingredient => ingredient.name);
+            
+            // If no ingredients selected, use all ingredients
+            const ingredientsToSearch = selectedIngredients.length > 0 
+                ? selectedIngredients 
+                : currentIngredients.map(ingredient => ingredient.name);
+            
+            console.log('🛍️ Searching for stores with ingredients:', ingredientsToSearch);
+            
+            // Find nearby stores
+            const nearbyStores = await LocationService.findStores(ingredientsToSearch);
+            setStores(nearbyStores);
+            
+        } catch (error) {
+            console.error('Failed to find stores:', error);
+            setStoresError(error.message);
+            setStores([]);
+        } finally {
+            setStoresLoading(false);
+        }
     };
 
     const closeStoresModal = () => {
@@ -44,42 +92,100 @@ function FoodInformation() {
         }
     };
 
-    // shared directions data used by both Directions and Steps
-    const directions = [
-        {
-            id: 1,
-            text: "Heat 1/4 cup of vegetable oil in a large pot over ",
-            heat: "medium",
-            ingredients: ["Vegetable Oil", "Onion"],
-            time: "05:00"
-        },
-        {
-            id: 2,
-            text: "Add minced garlic and cook until fragrant over ",
-            heat: "low",
-            ingredients: ["Garlic"],
-            time: "00:30"
-        },
-        {
-            id: 3,
-            text: "Pour in chicken stock and bring to a boil, then reduce to ",
-            heat: "low",
-            ingredients: ["Chicken Stock"],
-            time: "10:00"
-        },
-        {
-            id: 4,
-            text: "Simmer for 20 minutes, then serve hot.",
-            heat: "low",
-            ingredients: ["Vegetable Oil", "Onion", "Garlic", "Chicken Stock"],
-            time: "20:00"
-        }
-    ];
+    // Transform API ingredients data to match component expectations
+    const transformIngredients = (apiIngredients) => {
+        if (!Array.isArray(apiIngredients)) return [];
+        
+        return apiIngredients.map((ingredient, index) => {
+            const amount = ingredient.amount || ingredient.quantity || "";
+            
+            // Parse quantity and unit from amount string
+            const parseAmountString = (amountStr) => {
+                if (!amountStr || typeof amountStr !== 'string') {
+                    return { quantity: "", unit: "" };
+                }
+                
+                // Try to extract number and unit (e.g., "2 cloves", "1 small can", "sufficient for 2 servings")
+                const match = amountStr.match(/^(\d*\.?\d+)\s*(.*)$/) || 
+                             amountStr.match(/^(.*?)\s+(.*)$/);
+                
+                if (match && match[1] && /^\d*\.?\d+$/.test(match[1].trim())) {
+                    // First part is a number
+                    return {
+                        quantity: match[1].trim(),
+                        unit: match[2].trim()
+                    };
+                } else {
+                    // No clear numeric quantity, treat whole string as quantity
+                    return {
+                        quantity: amountStr,
+                        unit: ""
+                    };
+                }
+            };
+            
+            const { quantity, unit } = parseAmountString(amount);
+            
+            return {
+                id: index + 1,
+                name: ingredient.item || ingredient.name || ingredient,
+                quantity: quantity,
+                unit: unit,
+                checked: false
+            };
+        });
+    };
+
+    // Transform API steps data to match component expectations  
+    const transformDirections = (apiSteps) => {
+        if (!Array.isArray(apiSteps)) return [];
+        
+        return apiSteps.map((step, index) => {
+            // Generate video chapter link for each step
+            const getStepVideoLink = (stepIndex) => {
+                const videoId = recipeData?.videoId;
+                if (!videoId) {
+                    return null; // No video available
+                }
+
+                // Create YouTube link with estimated timestamp
+                // Fix alignment: step content appears one position later in video
+                const baseOffset = 30; // Skip intro
+                const stepInterval = 90; // 1.5 minutes per step
+                const maxVideoTime = getVideoDuration(); // Dynamic video duration
+                
+                // Add 1 to stepIndex to align with video content timing
+                let adjustedIndex = stepIndex + 1;
+                let estimatedSeconds = baseOffset + (adjustedIndex * stepInterval);
+                estimatedSeconds = Math.min(estimatedSeconds, maxVideoTime);
+                
+                return `https://www.youtube.com/watch?v=${videoId}&t=${estimatedSeconds}s`;
+            };
+
+            return {
+                id: index + 1,
+                text: step.instruction || step.text || step,
+                heat: step.temperature || step.heatLevel || "medium",
+                time: step.time || step.estimatedTime || "05:00",
+                ingredients: step.ingredients || [],
+                videoLink: step.videoLink || getStepVideoLink(index)
+            };
+        });
+    };
+
+    // Use API data only - no fallback demo data
+    const ingredients = useMemo(() => (
+        recipeData ? transformIngredients(recipeData.recipe?.ingredients || []) : []
+    ), [recipeData]);
+    const directions = recipeData ? transformDirections(recipeData.recipe?.steps || []) : [];
 
     return (
         <div className="page food-info-page">
             <div className="header">
-                <Navbar showCloseButton={true} />
+                <Navbar 
+                    showBackButton={true} 
+                    foodName={getDisplayName()} 
+                />
                 <div className="tab-bar">
                     <div className="segmented-controls" data-active={activeTab}>
                         <input 
@@ -104,58 +210,31 @@ function FoodInformation() {
             <div className="main-content with-segmented-controls">
                 <div className="container layout-sm">
                     {activeTab === 'ingredients' ? (
+                        <div className="ingredient-container">
+                            <div className="ingredient-title">
+                                <div className="ingredient-text"><h4 className="ingredient-heading">Ingredients</h4><p className="ingredient-subheading">Select the ingredients you don’t have to see nearby store options or copy them to your list.</p></div>
+                                <button 
+                                    className="ingredient-select-button" 
+                                    id="select-all"
+                                    onClick={() => {
+                                        if (ingredientsRef.current && ingredientsRef.current.setAllChecked) {
+                                            const next = !allSelected;
+                                            ingredientsRef.current.setAllChecked(next);
+                                            setAllSelected(next);
+                                        }
+                                    }}
+                                >{allSelected ? 'Unselect all' : 'Select all'}</button>
+                                </div>
                         <Ingredients 
-                            ingredients={[
-                                {
-                                    id: 1,
-                                    name: "Scales",
-                                    quantity: "1",
-                                    unit: " Medium",
-                                    checked: false
-                                },
-                                {
-                                    id: 2,
-                                    name: "Garlic",
-                                    quantity: "3",
-                                    unit: " Cloves",
-                                    checked: false
-                                },
-                                {
-                                    id: 3,
-                                    name: "Onion",
-                                    quantity: "1",
-                                    unit: " Large",
-                                    checked: false
-                                },
-                                {
-                                    id: 4,
-                                    name: "Olive Oil",
-                                    quantity: "2",
-                                    unit: " Tablespoons",
-                                    checked: false
-                                },
-                                {
-                                    id: 5,
-                                    name: "Red Bell Pepper",
-                                    checked: false
-                                },
-                                {
-                                    id: 6,
-                                    name: "Vegetable Oil",
-                                    quantity: "1/3",
-                                    unit: " Cups",
-                                    checked: false
-                                },
-                                {
-                                    id: 7,
-                                    name: "Chicken Stock",
-                                    quantity: "1",
-                                    unit: " Cups",
-                                    checked: false
-                                }
-
-                            ]}
-                                                />
+                            ref={ingredientsRef}
+                            ingredients={ingredients}
+                            servingMultiplier={servingMultiplier}
+                            onChange={(list) => {
+                                // Update allSelected state when any change occurs
+                                const everyChecked = list.length > 0 && list.every(i => i.checked);
+                                setAllSelected(everyChecked);
+                            }}
+                        /></div>
                     ) : (
                         <Directions ref={directionsRef} steps={directions} onActiveChange={(i) => setActiveDirectionIndex(i)} />
                     )}
@@ -167,6 +246,41 @@ function FoodInformation() {
                 primaryButtonText="Stores"
                 secondaryButtonText="Copy"
                 onTap={openStoresModal}
+                onCancel={() => {
+                    // Build copy text from current ingredients (checked or all if none checked)
+                    let currentIngredients = [];
+                    if (ingredientsRef.current && ingredientsRef.current.getCurrentIngredients) {
+                        currentIngredients = ingredientsRef.current.getCurrentIngredients();
+                    } else {
+                        currentIngredients = ingredients; // fallback local variable
+                    }
+                    const selected = currentIngredients.filter(i => i.checked);
+                    const source = selected.length ? selected : currentIngredients;
+                    const lines = source.map(i => {
+                        const qty = [i.quantity, i.unit].filter(Boolean).join(' ');
+                        return qty ? `${i.name} - ${qty}` : i.name;
+                    });
+                    const text = lines.join('\n');
+                    const performCopy = () => {
+                        if (navigator?.clipboard?.writeText) {
+                            return navigator.clipboard.writeText(text).catch(() => fallback());
+                        } else {
+                            return fallback();
+                        }
+                    };
+                    const fallback = () => {
+                        const ta = document.createElement('textarea');
+                        ta.value = text; document.body.appendChild(ta); ta.select();
+                        try { document.execCommand('copy'); } catch (e) {}
+                        document.body.removeChild(ta);
+                    };
+                    performCopy().finally(() => {
+                        // Show toast confirmation
+                        setShowToast(true);
+                        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                        toastTimerRef.current = setTimeout(() => setShowToast(false), 2500);
+                    });
+                }}
                 primaryButtonIcon={<svg width="23" height="23" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <g clip-path="url(#clip0_618_16806)">
                                     <path d="M19.9375 9.875C19.9375 16.4375 11.5 22.0625 11.5 22.0625C11.5 22.0625 3.0625 16.4375 3.0625 9.875C3.0625 7.63724 3.95145 5.49112 5.53379 3.90879C7.11612 2.32645 9.26224 1.4375 11.5 1.4375C13.7378 1.4375 15.8839 2.32645 17.4662 3.90879C19.0486 5.49112 19.9375 7.63724 19.9375 9.875Z" stroke="white" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
@@ -202,41 +316,15 @@ function FoodInformation() {
                 >
                     <Stores 
                         onClose={closeStoresModal}
-                        stores={[
-                            {
-                                id: 1,
-                                name: "Sainsbury's Local",
-                                distance: "0.1 miles",
-                                phone: "03331234567",
-                                phoneDisplay: "0333 123 4567",
-                                location: "#"
-                            },
-                            {
-                                id: 2,
-                                name: "Tesco Express",
-                                distance: "0.3 miles", 
-                                phone: "03451677890",
-                                phoneDisplay: "0345 167 7890",
-                                location: "#"
-                            },
-                            {
-                                id: 3,
-                                name: "ASDA Superstore",
-                                distance: "0.5 miles",
-                                phone: "08001234567",
-                                phoneDisplay: "0800 123 4567", 
-                                location: "#"
-                            },
-                            {
-                                id: 4,
-                                name: "Morrisons",
-                                distance: "0.7 miles",
-                                phone: "08701112234",
-                                phoneDisplay: "0870 111 2234",
-                                location: "#"
-                            }
-                        ]}
+                        stores={stores}
+                        loading={storesLoading}
+                        error={storesError}
                     />
+                </div>
+            )}
+            {showToast && (
+                <div className="bottom-toast" role="status" aria-live="polite">
+                    Ingredients copied
                 </div>
             )}
         </div>

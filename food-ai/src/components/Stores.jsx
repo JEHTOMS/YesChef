@@ -6,6 +6,8 @@ import './Stores.css';
 
 function Stores(props) {
     const stores = props.stores || [];
+    const loading = props.loading || false;
+    const error = props.error || null;
 
     const handleCloseClick = () => {
         if (props.onClose) {
@@ -26,7 +28,21 @@ function Stores(props) {
                     </div>
                     <div className="store-wrapper">
                         <ul className="store-list">
-                            {stores.length > 0 ? (
+                            {loading ? (
+                                <li className="store-item loading">
+                                    <div className="store-info">
+                                        <span className="store-name text-lg">Finding nearby stores...</span>
+                                        <span className="store-numerics text-sm">Please wait while we locate stores near you</span>
+                                    </div>
+                                </li>
+                            ) : error ? (
+                                <li className="store-item error">
+                                    <div className="store-info">
+                                        <span className="store-name text-lg">Unable to find stores</span>
+                                        <span className="store-numerics text-sm">{error}</span>
+                                    </div>
+                                </li>
+                            ) : stores.length > 0 ? (
                                 stores.map((store) => (
                                     <li className="store-item" id={`store-${store.id}`} key={store.id}>
                                         <div className="store-info">
@@ -36,7 +52,7 @@ function Stores(props) {
                                                 <a href={`tel:${store.phone}`} className="store-number">{store.phoneDisplay}</a>
                                             </span>
                                         </div>
-                                        <a href={store.location} className="store-location">
+                                        <a href={store.location} target="_blank" rel="noopener noreferrer" className="store-location">
                                             <div className="icon-button">
                                                <svg width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                 <g clipPath="url(#clip0_618_16835)">
@@ -56,7 +72,8 @@ function Stores(props) {
                             ) : (
                                 <li className="store-item no-stores">
                                     <div className="store-info">
-                                        <span className="store-name text-lg">No store found</span>
+                                        <span className="store-name text-lg">No stores found</span>
+                                        <span className="store-numerics text-sm">Try adjusting your location or check back later</span>
                                     </div>
                                 </li>
                             )}

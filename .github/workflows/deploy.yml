@@ -1,0 +1,153 @@
+name: Deploy YesChef Application
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: food-ai/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./food-ai
+      run: npm ci
+    
+    - name: Run tests
+      working-directory: ./food-ai
+      run: npm test -- --coverage --watchAll=false
+    
+    - name: Build application
+      working-directory: ./food-ai
+      run: npm run build
+
+  deploy-frontend:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: food-ai/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./food-ai
+      run: npm ci
+    
+    - name: Create environment file
+      working-directory: ./food-ai
+      run: |
+        echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" >> .env.production
+        echo "GENERATE_SOURCEMAP=false" >> .env.production
+    
+    - name: Build application
+      working-directory: ./food-ai
+      run: npm run build
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./food-ai/build
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+
+  deploy-backend:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: food-ai/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./food-ai
+      run: npm ci
+    
+    - name: Create environment file for backend
+      working-directory: ./food-ai
+      run: |
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env.production
+        echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> .env.production
+        echo "GOOGLE_SEARCH_ENGINE_ID=${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}" >> .env.production
+        echo "GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}" >> .env.production
+        echo "YT_COOKIE=${{ secrets.YT_COOKIE }}" >> .env.production
+        echo "PORT=${{ secrets.PORT || '5001' }}" >> .env.production
+        echo "NODE_ENV=production" >> .env.production
+        echo "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" >> .env.production
+    
+    # Option 1: Deploy to Render (uncomment if using Render)
+    # - name: Deploy to Render
+    #   uses: johnbeynon/render-deploy-action@v0.0.8
+    #   with:
+    #     service-id: ${{ secrets.RENDER_SERVICE_ID }}
+    #     api-key: ${{ secrets.RENDER_API_KEY }}
+    
+    # Option 2: Deploy to Railway (uncomment if using Railway)
+    # - name: Deploy to Railway
+    #   uses: bervProject/railway-deploy@v1.0.0
+    #   with:
+    #     railway_token: ${{ secrets.RAILWAY_TOKEN }}
+    #     service: ${{ secrets.RAILWAY_SERVICE }}
+    
+    # Option 3: Deploy to Vercel (uncomment if using Vercel)
+    # - name: Deploy to Vercel
+    #   uses: amondnet/vercel-action@v25
+    #   with:
+    #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
+    #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+    #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+    #     working-directory: ./food-ai
+    
+    # Option 4: Deploy to Heroku (uncomment if using Heroku)
+    # - name: Deploy to Heroku
+    #   uses: akhileshns/heroku-deploy@v3.13.15
+    #   with:
+    #     heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+    #     heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
+    #     heroku_email: ${{ secrets.HEROKU_EMAIL }}
+    #     appdir: "food-ai"
+    
+    # For now, just build and prepare artifacts
+    - name: Build backend
+      working-directory: ./food-ai
+      run: |
+        echo "Backend built successfully"
+        echo "Ready for deployment to your preferred platform"

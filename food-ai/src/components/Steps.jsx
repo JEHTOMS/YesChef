@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useRecipe } from '../context/RecipeContext';
 import '../index.css';
 import '../pages/Home.css';
 import '../pages/FoodInfo.css';
 import './Steps.css';
+
 function Steps({ steps = [], onStepClick, activeStep = 0 }) {
+    const { recipeData, getVideoDuration } = useRecipe();
     const [collapsed, setCollapsed] = useState(true);
     const listRef = useRef(null);
 
@@ -12,6 +15,33 @@ function Steps({ steps = [], onStepClick, activeStep = 0 }) {
         // If collapsed, expand first and then navigate
         if (collapsed) setCollapsed(false);
         if (typeof onStepClick === 'function') onStepClick(idx);
+    };
+
+    // Create video chapter link for each step
+    const getStepVideoLink = (step, stepIndex) => {
+        // Check if step already has a specific videoLink
+        if (step.videoLink) {
+            return step.videoLink;
+        }
+
+        // Check if we have video data from recipe context
+        const videoId = recipeData?.videoId;
+        if (!videoId) {
+            return `#step-${stepIndex + 1}`; // Fallback to anchor link
+        }
+
+        // Create YouTube link with estimated timestamp
+        // Fix alignment: step content appears one position later in video
+        const baseOffset = 30; // Skip intro
+        const stepInterval = 90; // 1.5 minutes per step
+        const maxVideoTime = getVideoDuration(); // Dynamic video duration
+        
+        // Add 1 to stepIndex to align with video content timing
+        let adjustedIndex = stepIndex + 1;
+        let estimatedSeconds = baseOffset + (adjustedIndex * stepInterval);
+        estimatedSeconds = Math.min(estimatedSeconds, maxVideoTime);
+        
+        return `https://www.youtube.com/watch?v=${videoId}&t=${estimatedSeconds}s`;
     };
 
     const toggleCollapsed = (e) => {
@@ -71,9 +101,25 @@ function Steps({ steps = [], onStepClick, activeStep = 0 }) {
                                     const isPast = idx < activeStep;
                                     const isFuture = idx > activeStep;
                                     const itemClass = `step-item text-lg ${isActive ? 'active-step' : ''} ${isPast ? 'past-step' : ''} ${isFuture ? 'future-step' : ''}`;
+                                    const videoLink = getStepVideoLink(step, idx);
+                                    const isExternalLink = videoLink.startsWith('http');
+                                    
                                     return (
-                                    <li key={step.id || idx} className={itemClass} onClick={(e) => handleItemClick(e, idx)}>
-                                        <a href={`#step-${idx + 1}`} className={`step-number icon-button ${isActive ? 'step-number-active' : ''}`} id={`step-${idx + 1}`}>{idx + 1}</a>
+                                    <li key={step.id || idx} className={itemClass} onClick={(e) => handleItemClick(e, idx)} id={`step-${idx + 1}`}>
+                                        <a 
+                                            href={videoLink}
+                                            className={`step-number icon-button ${isActive ? 'step-number-active' : ''} ${isExternalLink ? 'step-video-link' : ''}`} 
+                                            target={isExternalLink ? "_blank" : undefined}
+                                            rel={isExternalLink ? "noopener noreferrer" : undefined}
+                                            title={isExternalLink ? `Watch step ${idx + 1} in video` : `Go to step ${idx + 1}`}
+                                            onClick={(e) => {
+                                                if (isExternalLink) {
+                                                    e.stopPropagation(); // Prevent handleItemClick from firing
+                                                }
+                                            }}
+                                        >
+                                            {idx + 1}
+                                        </a>
                                         <span className="step-type" id={`step-${idx + 1}-text`}>{step.text}</span>
                                     </li>
                                 )})}

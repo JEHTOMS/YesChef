@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "name": "yeschef",
+  "builds": [
+    {
+      "src": "food-ai/server-clean.mjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "food-ai/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "cd food-ai && npm run build",
+        "outputDirectory": "food-ai/build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/food-ai/server-clean.mjs"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/food-ai/build/$1"
+    }
+  ],
+  "env": {
+    "OPENAI_API_KEY": "@openai-api-key",
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "food-ai/server-clean.mjs": {
+      "maxDuration": 30
+    }
+  }
+}

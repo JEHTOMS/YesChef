@@ -70,6 +70,27 @@ text-align: left;
         color: #FFFFFF !important;
     }
 
+    /* Video link indicator - subtle visual cue */
+    .step-video-link {
+        position: relative;
+    }
+    .step-video-link::after {
+        content: '▶';
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        font-size: 8px;
+        color: #FF4444;
+        background: white;
+        border-radius: 50%;
+        width: 12px;
+        height: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+
     /* Past steps retain a subtle filled style to indicate completed */
     .step-item.past-step {
         background: rgba(240, 77, 204, 0.08);

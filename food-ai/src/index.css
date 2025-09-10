@@ -16,6 +16,7 @@ body {
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: #F7F7F7;
   -moz-osx-font-smoothing: grayscale;
 }
 
@@ -26,7 +27,6 @@ code {
 
 .page{
     background: #F7F7F7;
-    height: 100svh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -64,9 +64,11 @@ letter-spacing: -0.72px;
 font-family: "Shippori Antique B1";
 font-size: 14px;
 font-style: normal;
+text-wrap: auto;
 font-weight: 400;
-line-height: 150%; /* 26.4px */
+line-height: 130%; /* 26.4px */
 letter-spacing: -0.28px;
+text-align: left;
 }
 
 .text-lg{
@@ -141,6 +143,7 @@ background: #FFF;
 .footer.no-bg {
   background: transparent !important;
   border: 0 !important;
+  position: fixed;
 }
 
 .footer .container{
@@ -151,3 +154,12 @@ background: #FFF;
   flex-direction: row;
     gap: 16px;
 }
+
+.mg-240{
+  margin-bottom: 240px;
+}
+
+.pd-240{
+  padding-bottom: 240px;
+}
+

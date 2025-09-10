@@ -15,7 +15,7 @@ import 'swiper/css/mousewheel';
 const Directions = forwardRef(function Directions({ steps = [], onActiveChange }, ref) {
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const swiperRef = useRef(null);
-    // timers state (seconds remaining) keyed by slide index
+    // timers state (seconds remaining) keyed by unique timer ID (stepIndex-timerIndex)
     const [timers, setTimers] = useState({});
     const intervalsRef = useRef({});
     // audio ref for alarm playback
@@ -35,7 +35,7 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
     }, []);
 
     // Parse a step.time value into seconds.
-    // Accepts numbers (minutes), strings like '5', '5 mins', '1:30', or '90s'.
+    // Accepts numbers (minutes), strings like '5', '5 mins', '1:30', '90s', or hours like '1.5 hours', '1 hr', '2h'.
     const parseTimeToSeconds = useCallback((timeValue) => {
         if (timeValue == null) return 0;
         // If already a finite number, assume minutes
@@ -51,6 +51,13 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
             if (Number.isFinite(mins) && Number.isFinite(secs)) {
                 return Math.max(0, mins * 60 + Math.floor(secs));
             }
+        }
+
+        // Hours like '1.5 hours', '1 hr', '2h'
+        const hoursMatch = s.match(/([0-9]*\.?[0-9]+)\s*(h|hr|hrs|hour|hours)\b/i);
+        if (hoursMatch) {
+            const num = Number(hoursMatch[1]);
+            if (Number.isFinite(num)) return Math.max(0, Math.floor(num * 3600));
         }
 
         // If contains seconds unit like '90s' or '30 sec'
@@ -71,36 +78,36 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
         return 0;
     }, []);
 
-    const clearTimer = useCallback((index) => {
-        const id = intervalsRef.current[index];
+    const clearTimer = useCallback((timerId) => {
+        const id = intervalsRef.current[timerId];
         if (id) {
             clearInterval(id);
-            delete intervalsRef.current[index];
+            delete intervalsRef.current[timerId];
         }
     }, []);
 
-    const startTimer = useCallback((index, initialSeconds) => {
+    const startTimer = useCallback((timerId, initialSeconds) => {
         if (!initialSeconds || initialSeconds <= 0) return;
-        clearTimer(index);
-        setTimers((prev) => ({ ...prev, [index]: initialSeconds }));
-        intervalsRef.current[index] = setInterval(() => {
+        clearTimer(timerId);
+        setTimers((prev) => ({ ...prev, [timerId]: initialSeconds }));
+        intervalsRef.current[timerId] = setInterval(() => {
             setTimers((prev) => {
-                const cur = prev[index] ?? 0;
+                const cur = prev[timerId] ?? 0;
                 if (cur <= 1) {
                     // reach zero, stop interval and set 0
-                    clearTimer(index);
+                    clearTimer(timerId);
                     // mark 0 and allow playing alarm below via effect
-                    return { ...prev, [index]: 0 };
+                    return { ...prev, [timerId]: 0 };
                 }
-                return { ...prev, [index]: cur - 1 };
+                return { ...prev, [timerId]: cur - 1 };
             });
         }, 1000);
     }, [clearTimer]);
 
     // restart the timer (reset to initial and start)
-    const restartTimer = useCallback((index, initialSeconds) => {
-        clearTimer(index);
-        startTimer(index, initialSeconds);
+    const restartTimer = useCallback((timerId, initialSeconds) => {
+        clearTimer(timerId);
+        startTimer(timerId, initialSeconds);
     }, [clearTimer, startTimer]);
 
     // cleanup on unmount
@@ -172,9 +179,13 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
 
     // when a timer reaches 0 and its step is active, play the alarm once; allow one replay while still active
     useEffect(() => {
-        // check current active step timer
-        const remaining = timers[activeStepIndex];
-        if (remaining === 0) {
+        // check if any timer for the current active step has reached 0
+        const activeTimerPrefix = `${activeStepIndex}-`;
+        const hasZeroTimer = Object.keys(timers).some(timerId => 
+            timerId.startsWith(activeTimerPrefix) && timers[timerId] === 0
+        );
+        
+        if (hasZeroTimer) {
             // only auto-play once per activation unless re-started
             if (!alarmPlayedRef.current[activeStepIndex]) {
                 alarmPlayedRef.current[activeStepIndex] = 1; // mark played once
@@ -255,12 +266,21 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                                 >
                                     <div className={`step-header${isDisabled ? ' disabled-step' : ''}`}>
                                         <a
-                                            href={`#step-${index + 1}`}
+                                            href={step.videoLink || `#step-${index + 1}`}
                                             className="step-link text-lg"
                                             onClick={(e) => {
-                                                e.preventDefault();
-                                                goToStep(index);
+                                                if (step.videoLink) {
+                                                    // Open video at specific timestamp
+                                                    e.preventDefault();
+                                                    window.open(step.videoLink, '_blank');
+                                                } else {
+                                                    // Default behavior for navigation
+                                                    e.preventDefault();
+                                                    goToStep(index);
+                                                }
                                             }}
+                                            target={step.videoLink ? "_blank" : undefined}
+                                            rel={step.videoLink ? "noopener noreferrer" : undefined}
                                         >
                                             Step {index + 1} <svg width="23" height="23" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
 <mask id="path-1-inside-1_618_16948" fill="white">
@@ -282,55 +302,138 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                                     </div>
                                     <div className="step-content">
                                         <h1 className="text-title">
-                                            {step.text}
-                                            {step.heat && (
-                                                <span className={`heat-${step.heat}${isDisabled ? ' disabled-step' : ''}${(isActive && shimmerTrigger === index) ? ' shimmer' : ''}`}>
-                                                    {step.heat} heat.
-                                                </span>
-                                            )}
-                                            {step.time && (
-                                                <>
-                                                    {step.text && !step.text.endsWith('.') ? ',' : ''} about <span className="time-wrapper">
-                                                        <span
-                                                            className={`time timer${isDisabled ? ' disabled-step' : ''}`}
-                                                            onClick={() => {
-                                                                if (!isActive) return;
-                                                                const initial = parseTimeToSeconds(step.time);
-                                                                if (!initial) return;
-                                                                const cur = timers[index] != null && Number.isFinite(Number(timers[index])) ? timers[index] : null;
-                                                                // If timer is at 0, clicking stops the alarm
-                                                                if (cur === 0) {
-                                                                    if (alarmRef.current) {
-                                                                        try { alarmRef.current.pause(); alarmRef.current.currentTime = 0; } catch (e) {}
-                                                                    }
-                                                                    // clear played flag so it can replay again if restarted
-                                                                    delete alarmPlayedRef.current[index];
-                                                                    return;
-                                                                }
-                                                                // If running, pause
-                                                                if (intervalsRef.current[index]) {
-                                                                    // pause: clear interval but keep remaining time
-                                                                    clearTimer(index);
-                                                                    // paused
-                                                                    return;
-                                                                }
-                                                                // if not running, resume from remaining or initial
-                                                                const startFrom = (timers[index] != null && Number.isFinite(Number(timers[index]))) ? timers[index] : initial;
-                                                                startTimer(index, startFrom);
-                                                            }}
-                                                            onDoubleClick={() => {
-                                                                if (!isActive) return;
-                                                                const initial = parseTimeToSeconds(step.time);
-                                                                if (!initial) return;
-                                                                restartTimer(index, initial);
-                                                            }}
-                                                        >
-                                                            {formatTime((timers[index] != null && Number.isFinite(Number(timers[index]))) ? timers[index] : parseTimeToSeconds(step.time))}
-                                                        </span>
-                                                        <span className="minutes-text">minutes</span>
-                                                    </span>.
-                                                </>
-                                            )}
+{(() => {
+                                                // INLINE-ONLY rendering: parse instruction text and wrap time/heat phrases with spans
+                                                const raw = step.text || step.instruction || '';
+                                                if (!raw) return null;
+
+                                                const replacements = [];
+
+                                                // Enhanced heat regex to catch more patterns including temperatures
+                                                const heatPattern = /\b(?:(?:over|on|at|to)\s+)?((?:low|medium(?:\s*-\s*(?:low|high)|\s+(?:to|heat))?|medium\s*-\s*high|high)(?:\s+heat)?|\d{2,3}°[FC]?|\d{2,3}\s*degrees?\s*[FC]?)\b/gi;
+                                                
+                                                // Enhanced time regex to catch more patterns including "about X minutes"
+                                                const timePattern = /\b(?:about\s+)?(\d+(?:\.\d+)?(?::\d{1,2})?)\s*(?:to\s+\d+\s*)?(h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|seconds)\b/gi;
+
+                                                let match;
+                                                
+                                                // Find all heat matches
+                                                heatPattern.lastIndex = 0;
+                                                while ((match = heatPattern.exec(raw)) !== null) {
+                                                    replacements.push({
+                                                        start: match.index,
+                                                        end: match.index + match[0].length,
+                                                        type: 'heat',
+                                                        text: match[0],
+                                                        heatValue: match[1] || match[0]
+                                                    });
+                                                }
+
+                                                // Find all time matches
+                                                timePattern.lastIndex = 0;
+                                                while ((match = timePattern.exec(raw)) !== null) {
+                                                    replacements.push({
+                                                        start: match.index,
+                                                        end: match.index + match[0].length,
+                                                        type: 'time',
+                                                        text: match[0],
+                                                        timeValue: match[0]
+                                                    });
+                                                }
+
+                                                // Sort by position to process in order
+                                                replacements.sort((a, b) => a.start - b.start);
+
+                                                if (replacements.length === 0) {
+                                                    return raw; // No matches, return plain text
+                                                }
+
+                                                // Build JSX with inline spans
+                                                const elements = [];
+                                                let lastEnd = 0;
+
+                                                replacements.forEach((repl, idx) => {
+                                                    // Add text before this replacement
+                                                    if (repl.start > lastEnd) {
+                                                        elements.push(raw.slice(lastEnd, repl.start));
+                                                    }
+
+                                                    // Add the span for this replacement
+                                                    if (repl.type === 'heat') {
+                                                        const heatClass = repl.heatValue.toLowerCase()
+                                                            .replace(/\s+heat\b/, '')
+                                                            .replace(/\s+/g, '-')
+                                                            .replace(/[^a-z0-9-]/g, '')
+                                                            .replace(/degrees?/g, 'deg')
+                                                            .replace(/^(\d+)-deg-([fc])$/, '$1$2'); // "350-deg-f" -> "350f"
+                                                        
+                                                        elements.push(
+                                                            <span 
+                                                                key={`heat-${idx}`} 
+                                                                className={`heat-${heatClass}${isDisabled ? ' disabled-step' : ''}${(isActive && shimmerTrigger === index) ? ' shimmer' : ''}`}
+                                                            >
+                                                                {repl.text}
+                                                            </span>
+                                                        );
+                                                    } else if (repl.type === 'time') {
+                                                        // Use unique timer ID for each time span in each step
+                                                        const timerId = `${index}-${idx}`;
+                                                        // Use the actual parsed time from the text match, not step.time
+                                                        const timeSeconds = parseTimeToSeconds(repl.timeValue);
+                                                        const displayTime = (timers[timerId] != null && Number.isFinite(Number(timers[timerId]))) ? timers[timerId] : timeSeconds;
+                                                        
+                                                        elements.push(
+                                                            <span key={`time-${idx}`} className="time-wrapper">
+                                                                <span
+                                                                    className={`time timer${isDisabled ? ' disabled-step' : ''}`}
+                                                                    onClick={() => {
+                                                                        if (!isActive || !timeSeconds) return;
+                                                                        const cur = timers[timerId];
+                                                                        
+                                                                        if (cur === 0) {
+                                                                            // Stop alarm
+                                                                            if (alarmRef.current) {
+                                                                                try { 
+                                                                                    alarmRef.current.pause(); 
+                                                                                    alarmRef.current.currentTime = 0; 
+                                                                                } catch (e) {}
+                                                                            }
+                                                                            delete alarmPlayedRef.current[index];
+                                                                            return;
+                                                                        }
+                                                                        
+                                                                        if (intervalsRef.current[timerId]) {
+                                                                            // Pause timer
+                                                                            clearTimer(timerId);
+                                                                            return;
+                                                                        }
+                                                                        
+                                                                        // Start/resume timer
+                                                                        const startFrom = (cur != null && Number.isFinite(cur)) ? cur : timeSeconds;
+                                                                        startTimer(timerId, startFrom);
+                                                                    }}
+                                                                    onDoubleClick={() => {
+                                                                        if (!isActive || !timeSeconds) return;
+                                                                        restartTimer(timerId, timeSeconds);
+                                                                    }}
+                                                                >
+                                                                    {formatTime(displayTime)}
+                                                                </span>
+                                                                <span className="minutes-text">minutes</span>
+                                                            </span>
+                                                        );
+                                                    }
+
+                                                    lastEnd = repl.end;
+                                                });
+
+                                                // Add remaining text after last replacement
+                                                if (lastEnd < raw.length) {
+                                                    elements.push(raw.slice(lastEnd));
+                                                }
+
+                                                return elements;
+                                            })()}
                                         </h1>
                                     </div>
                                 </div>

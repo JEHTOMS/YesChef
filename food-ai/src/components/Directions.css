@@ -74,6 +74,7 @@ width: auto;
 
 .step-ingredients{
     display: flex;
+    flex-wrap: wrap;
 align-items: flex-start;
 gap: 8px;
 list-style: none;
@@ -179,4 +180,15 @@ background: rgba(58, 58, 58, 0.06);
 .disabled-step .heat-high{
     color: #00000066 !important;
     background: rgba(58, 58, 58, 0.00);
+}
+
+@media (max-width: 640px) {
+  .directions {
+    padding: 0 16px;
+  }
+    /* Let steps expand to fit content on small screens instead of fixed 55svh */
+    .steps {
+        height: auto;
+        min-height: 55svh; /* keep a reasonable baseline for shorter steps */
+    }
 }

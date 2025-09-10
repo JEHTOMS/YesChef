@@ -1,0 +1,26 @@
+[build]
+  command = "cd food-ai && npm ci && npm run build"
+  publish = "food-ai/build"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_FLAGS = "--production=false"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  directory = "food-ai/netlify/functions"
+  node_bundler = "esbuild"
+
+[dev]
+  command = "cd food-ai && npm run dev"
+  port = 3001
+  targetPort = 5001

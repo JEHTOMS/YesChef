@@ -3,7 +3,12 @@ import '../index.css';
 import '../pages/Home.css';
 import '../pages/FoodO.css';
 
-function ToNote({items}) {
+function ToNote({ tools = [], allergens = [] }) {
+    // Don't render if no data
+    if (!tools.length && !allergens.length) {
+        return null;
+    }
+
     return (
         <div className="to-note">
             <h2 className="to-note-title text-subtitle">Things to note</h2>
@@ -11,7 +16,7 @@ function ToNote({items}) {
                 <div className="tools">
                     <h3 className="tools-title text-sm">Tools</h3>
                     <ul className="tools-list">
-                        {items.tools && items.tools.map((tool, index) => (
+                        {tools.map((tool, index) => (
                             <li key={index} className="tools-item text-sm">{tool}</li>
                         ))}
                     </ul>
@@ -30,11 +35,11 @@ function ToNote({items}) {
                                     </clipPath>
                                 </defs>
                             </svg>
-                            <span className="tooltiptext text-sm">Generic allergy information</span>
+                            <span className="tooltiptext text-sm">Based on the ingredients in this recipe</span>
                         </div>
                     </div>
                     <ul className="allergen-list">
-                        {items.allergens && items.allergens.map((allergen, index) => (
+                        {allergens.map((allergen, index) => (
                             <li key={index} className="allergen-item text-sm">{allergen}</li>
                         ))}
                     </ul>

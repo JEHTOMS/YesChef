@@ -6,7 +6,11 @@ function Button(props) {
     const buttonClass = props.className === 'secondary' ? 'sec-button' : 'pri-button';
     
     return (
-        <button className={`${buttonClass} text-lg`} onClick={props.onClick}>
+        <button 
+            className={`${buttonClass} text-lg`} 
+            onClick={props.onClick}
+            disabled={props.disabled}
+        >
             {props.showIcon && props.icon && (
                 <div>{props.icon}</div>
             )}
