@@ -242,7 +242,7 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                         thresholdDelta: 10,
                         thresholdTime: 80,
                         releaseOnEdges: true,
-                        eventsTarget: 'body'
+                        eventsTarget: 'container'
                     }}
                     keyboard={{ enabled: true }}
                     speed={600}
@@ -271,10 +271,9 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                                             onClick={(e) => {
                                                 if (step.videoLink) {
                                                     // Open video at specific timestamp
-                                                    e.preventDefault();
                                                     window.open(step.videoLink, '_blank');
                                                 } else {
-                                                    // Default behavior for navigation
+                                                    // Navigate to step
                                                     e.preventDefault();
                                                     goToStep(index);
                                                 }

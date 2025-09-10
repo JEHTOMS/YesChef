@@ -6,7 +6,6 @@ import '../pages/FoodO.css';
 function FoodHero({ image, name, videolink }) {
     const handleVideoClick = (e) => {
         if (videolink) {
-            e.preventDefault();
             window.open(videolink, '_blank');
         }
     };

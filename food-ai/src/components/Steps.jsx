@@ -11,7 +11,10 @@ function Steps({ steps = [], onStepClick, activeStep = 0 }) {
     const listRef = useRef(null);
 
     const handleItemClick = (e, idx) => {
-        e.preventDefault();
+        // Only prevent default for anchor links, not touch/click events
+        if (e.target.tagName === 'A') {
+            e.preventDefault();
+        }
         // If collapsed, expand first and then navigate
         if (collapsed) setCollapsed(false);
         if (typeof onStepClick === 'function') onStepClick(idx);
