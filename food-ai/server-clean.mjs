@@ -19,6 +19,9 @@ dotenv.config({ path: join(__dirname, '.env.local') });
 
 const app = express();
 
+// Use Railway's PORT or fallback to config PORT
+const serverPort = process.env.PORT || PORT;
+
 // Middleware
 app.use(cors(CORS_CONFIG));
 app.use(express.json());
@@ -79,8 +82,8 @@ app.get('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Clean Recipe AI server running on http://localhost:${PORT}`);
+app.listen(serverPort, () => {
+  console.log(`🚀 Clean Recipe AI server running on http://localhost:${serverPort}`);
   console.log('📋 Available endpoints:');
   console.log(`   POST ${ROUTES.CAPTIONS} - Extract video captions`);
   console.log(`   POST ${ROUTES.RECIPE} - Generate structured recipe`);

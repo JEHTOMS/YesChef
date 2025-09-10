@@ -1,0 +1,21 @@
+# Railway Backend Dockerfile
+FROM node:18-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY food-ai/package*.json ./
+RUN npm install --production
+
+# Copy source code
+COPY food-ai/src ./src/
+COPY food-ai/server-clean.mjs ./
+
+# Expose port
+EXPOSE 5001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:5001/health || exit 1
+
+CMD ["node", "server-clean.mjs"]

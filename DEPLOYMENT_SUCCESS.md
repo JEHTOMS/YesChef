@@ -51,7 +51,6 @@ Your deployed application includes:
 - 🔍 Recipe search and analysis
 - 📍 Location-based services
 - 🤖 AI-powered cooking assistance
-- 📱 Responsive design with Tailwind CSS
 
 ## Next Steps
 
