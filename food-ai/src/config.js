@@ -2,6 +2,11 @@
 // Following the architecture from DmitrySadovnikov/YouTube-Caption-Extractor
 
 // API Base URL - uses environment variable or falls back to localhost for development
+// Configuration constants for the YesChef application
+// Author: DmitrySadovnikov
+// Date: 2024
+// Connected to Railway backend
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 const ROUTES = {
