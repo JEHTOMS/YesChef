@@ -1,11 +1,22 @@
 // Configuration for the YouTube Caption Extractor backend
 // Following the architecture from DmitrySadovnikov/YouTube-Caption-Extractor
 
+// API Base URL - uses environment variable or falls back to localhost for development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
 const ROUTES = {
   HOME: '/',
   CAPTIONS: '/api/captions',
   RECIPE: '/api/recipe',
   STORES: '/api/stores',
+};
+
+// Full API URLs
+const API_ENDPOINTS = {
+  CAPTIONS: `${API_BASE_URL}/api/captions`,
+  RECIPE: `${API_BASE_URL}/api/recipe`,
+  STORES: `${API_BASE_URL}/api/stores`,
+  HEALTH: `${API_BASE_URL}/health`,
 };
 
 const OPENAI_CONFIG = {
@@ -22,6 +33,8 @@ const CORS_CONFIG = {
 const PORT = process.env.PORT || 5001;
 
 export {
+  API_BASE_URL,
+  API_ENDPOINTS,
   ROUTES,
   OPENAI_CONFIG,
   CORS_CONFIG,

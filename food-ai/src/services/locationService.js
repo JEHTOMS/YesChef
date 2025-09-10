@@ -1,5 +1,7 @@
 // Location service for getting user's geolocation
-export class LocationService {
+import { API_ENDPOINTS } from '../config.js';
+
+class LocationService {
   static async getUserLocation() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -50,7 +52,7 @@ export class LocationService {
       const userLocation = await this.getUserLocation();
       
       // Call backend API
-      const response = await fetch('/api/stores', {
+      const response = await fetch(API_ENDPOINTS.STORES, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,3 +77,5 @@ export class LocationService {
     }
   }
 }
+
+export { LocationService };

@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, useRef } from 'react';
+import React, { createContext, useContext, useState, useRef } from 'react';
+import { API_ENDPOINTS } from '../config.js';
 
 const RecipeContext = createContext();
 
@@ -48,7 +49,7 @@ export const RecipeProvider = ({ children }) => {
         setOriginalQuery(query);
 
         try {
-            const response = await fetch('/api/recipe', {
+            const response = await fetch(API_ENDPOINTS.RECIPE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -67,7 +68,7 @@ export const RecipeProvider = ({ children }) => {
                 // Fetch subtitle data if videoId is available
                 if (result.data?.videoId) {
                     try {
-                        const subtitleResponse = await fetch('/api/captions', {
+                        const subtitleResponse = await fetch(API_ENDPOINTS.CAPTIONS, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
