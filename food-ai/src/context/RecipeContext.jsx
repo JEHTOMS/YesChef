@@ -119,7 +119,7 @@ export const RecipeProvider = ({ children }) => {
     const isLikelyYoutube = (val) => {
         if (!val) return false;
         const trimmed = String(val).trim();
-        const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/ |\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
         const id11 = /^[a-zA-Z0-9_-]{11}$/;
         return ytRegex.test(trimmed) || id11.test(trimmed);
     };
