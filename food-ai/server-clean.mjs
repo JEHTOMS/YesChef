@@ -14,13 +14,31 @@ import { storesHandler } from './src/storesHandler.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables with absolute path
-dotenv.config({ path: join(__dirname, '.env.local') });
+// Load environment variables with absolute path - only if file exists
+const envPath = join(__dirname, '.env.local');
+try {
+    dotenv.config({ path: envPath });
+    console.log('🔧 Loaded local environment variables');
+} catch (err) {
+    console.log('⚙️ Using system environment variables (production mode)');
+}
 
 const app = express();
 
 // Use Railway's PORT or fallback to config PORT
 const serverPort = process.env.PORT || PORT;
+
+console.log('🚀 Starting YesChef Backend...');
+console.log(`📊 Node version: ${process.version}`);
+console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`📡 Port: ${serverPort}`);
+console.log(`🔑 Environment variables loaded:`, {
+    OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+    GOOGLE_API_KEY: !!process.env.GOOGLE_API_KEY,
+    GOOGLE_SEARCH_ENGINE_ID: !!process.env.GOOGLE_SEARCH_ENGINE_ID,
+    GOOGLE_PLACES_API_KEY: !!process.env.GOOGLE_PLACES_API_KEY,
+    YT_COOKIE: !!process.env.YT_COOKIE
+});
 
 // Middleware
 app.use(cors(CORS_CONFIG));

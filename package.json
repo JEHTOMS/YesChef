@@ -1,4 +1,17 @@
 {
+  "name": "yeschef-backend",
+  "version": "1.0.0",
+  "description": "YesChef Backend API for Railway deployment",
+  "main": "food-ai/server-clean.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "cd food-ai && npm install --production && node server-clean.mjs",
+    "build": "cd food-ai && npm install --production",
+    "dev": "cd food-ai && node server-clean.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "dotenv": "^17.2.2"
   }
