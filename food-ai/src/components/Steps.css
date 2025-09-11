@@ -30,7 +30,6 @@ text-align: left;
     flex-direction: column;
     gap: 8px;
     width: 100%;
-    max-height: 480px;
     overflow: auto;
     padding: 8px 8px;
     margin: 0;
@@ -175,3 +174,10 @@ text-align: left;
     .step-list.expanded .step-item{
         transition: all 300ms cubic-bezier(.2,.9,.2,1);
     }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    .step-list {
+        max-height: 320px;
+    }
+}
