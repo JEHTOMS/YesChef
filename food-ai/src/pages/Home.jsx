@@ -5,7 +5,7 @@ import './Home.css';
 import '../index.css';
 import Navbar from "../components/Navbar";
 import Input from "../components/Input";
-import Button from "../components/Button";
+import Footer from "../components/Footer";
 import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorOverlay from "../components/ErrorOverlay";
 
@@ -43,13 +43,16 @@ function Home() {
                         <Input onRecipeSubmit={handleVideoSubmit} />
                         <p className="description text-sm">Create recipe from a link or text.</p>
                     </div>
-                    <Button 
-                        buttonText="Create Recipe"
-                        onClick={handleExtractRecipe}
-                        disabled={!query.trim() || loading}
-                    />
                  </div>
             </div>
+            
+            <Footer 
+                buttonType="primary"
+                primaryButtonText="Create Recipe"
+                onTap={handleExtractRecipe}
+                disabled={!query.trim() || loading}
+                showIcon={false}
+            />
             
             {loading && (
                 <LoadingOverlay 

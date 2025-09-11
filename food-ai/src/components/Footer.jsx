@@ -14,7 +14,13 @@ function Footer(props) {
                     </Button>
                 )}
                 {showPrimary && (
-                    <Button buttonText={props.primaryButtonText || "Save & Continue"} showIcon={props.showIcon} icon={props.primaryButtonIcon} onClick={props.onTap}>
+                    <Button 
+                        buttonText={props.primaryButtonText || "Save & Continue"} 
+                        showIcon={props.showIcon} 
+                        icon={props.primaryButtonIcon} 
+                        onClick={props.onTap}
+                        disabled={props.disabled}
+                    >
                     </Button>
                 )}
             </div>
