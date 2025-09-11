@@ -37,6 +37,34 @@ export const RecipeProvider = ({ children }) => {
         }
     };
 
+    // Validate if input is food-related using OpenAI
+    const validateFoodInput = async (query, signal) => {
+        // Skip validation for YouTube URLs as they're likely recipe videos
+        if (isLikelyYoutube(query)) {
+            return { isFood: true, confidence: 1.0 };
+        }
+
+        try {
+            const response = await fetch(API_ENDPOINTS.RECIPE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    validateOnly: true, // Special flag for validation
+                    recipeName: query,
+                    lang: 'en'
+                }),
+                signal,
+            });
+
+            const result = await response.json();
+            return result.validation || { isFood: false, confidence: 0 };
+        } catch (err) {
+            // If validation fails, assume it might be food to avoid blocking valid requests
+            console.warn('Food validation failed:', err);
+            return { isFood: true, confidence: 0.5 };
+        }
+    };
+
     const searchRecipe = async (query) => {
         // Abort any in-flight request before starting a new one
         if (abortRef.current) {
@@ -49,6 +77,16 @@ export const RecipeProvider = ({ children }) => {
         setOriginalQuery(query);
 
         try {
+            // First validate if input is food-related (skip for YouTube URLs)
+            if (!isLikelyYoutube(query)) {
+                const validation = await validateFoodInput(query, controller.signal);
+                
+                // High confidence threshold to avoid false positives
+                if (!validation.isFood && validation.confidence > 0.8) {
+                    throw new Error(`"${query}" doesn't appear to be food-related. Please try searching for a recipe, dish name, or cooking video.`);
+                }
+            }
+
             const response = await fetch(API_ENDPOINTS.RECIPE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

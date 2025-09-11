@@ -5,9 +5,79 @@ import { OPENAI_CONFIG } from './config.js';
 // Add fetch polyfill
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
+// Validate if input is food-related using OpenAI
+async function validateFoodInput(query) {
+  try {
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      ...OPENAI_CONFIG
+    });
+
+    const prompt = `Analyze if the following input is food, cooking, or recipe-related. Return only a JSON object with "isFood" (boolean) and "confidence" (0-1).
+
+Input: "${query}"
+
+Consider food-related if it's:
+- A dish name, recipe, or cooking method
+- An ingredient or food item
+- A cooking technique or kitchen term
+- A restaurant dish or cuisine type
+
+NOT food-related if it's:
+- Clearly unrelated topics (sports, technology, politics, etc.)
+- Random text or gibberish
+- Non-food objects or concepts
+
+Be strict - only return isFood: false with high confidence (>0.8) if you're absolutely certain it's not food-related.`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 100,
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    
+    try {
+      const result = JSON.parse(content);
+      // Ensure valid response format
+      if (typeof result.isFood === 'boolean' && typeof result.confidence === 'number') {
+        return {
+          isFood: result.isFood,
+          confidence: Math.min(Math.max(result.confidence, 0), 1) // Clamp between 0-1
+        };
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse validation response:', content);
+    }
+
+    // Default to allowing the request if parsing fails
+    return { isFood: true, confidence: 0.5 };
+    
+  } catch (error) {
+    console.error('Food validation error:', error);
+    // Default to allowing the request if validation fails
+    return { isFood: true, confidence: 0.5 };
+  }
+}
+
 export async function recipeHandler(requestData) {
   try {
     console.log('Recipe handler received data:', JSON.stringify(requestData, null, 2));
+    
+    // Handle food validation requests
+    if (requestData.validateOnly) {
+      const validation = await validateFoodInput(requestData.recipeName);
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          success: true, 
+          validation 
+        }),
+      };
+    }
     
     // Verify API key exists
     if (!process.env.OPENAI_API_KEY) {

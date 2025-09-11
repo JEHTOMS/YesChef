@@ -51,6 +51,7 @@ font-style: normal;
 font-weight: 400;
 line-height: 124%; /* 39.6px */
 letter-spacing: -1.08px;
+text-align: left;
 }
 .text-subtitle{
   font-family: "Shippori Antique B1";
@@ -161,5 +162,12 @@ background: #FFF;
 
 .pd-240{
   padding-bottom: 240px;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .title {
+    font-size: 40px;
+  }
 }
 

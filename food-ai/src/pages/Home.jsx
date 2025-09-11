@@ -63,7 +63,8 @@ function Home() {
             )}
             {error && (
                 <ErrorOverlay 
-                    message={error}
+                    primaryMessage={error}
+                    secondaryMessage={error.includes("doesn't appear to be food-related") ? 'Try a dish, ingredient, cuisine, or paste a cooking video link.' : ''}
                     onClose={clearError}
                 />
             )}

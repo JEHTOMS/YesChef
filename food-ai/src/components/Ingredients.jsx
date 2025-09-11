@@ -95,7 +95,7 @@ const Ingredients = forwardRef(({ ingredients: initialIngredients, servingMultip
                         />
                         <label htmlFor={`ingredient-${ingredient.id}`}>
                             <div className="ingredient-details">
-                                <span className="ingredient-name text-lg">{ingredient.name}</span>
+                                <span className="ingredient-name text-lg" style={{ textTransform: 'capitalize' }}>{ingredient.name}</span>
                                 <span className="ingredient-quantity text-sm">
                                     <span className="amount">{ingredient.quantity}</span>
                                     <span className="unit">{ingredient.unit}</span>
