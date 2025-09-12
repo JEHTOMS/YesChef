@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useRecipe } from '../context/RecipeContext';
 import './Home.css';
@@ -11,8 +11,15 @@ import ErrorOverlay from "../components/ErrorOverlay";
 
 function Home() {
     const navigate = useNavigate();
-    const { searchRecipe, loading, error, clearError, cancelRecipeExtraction } = useRecipe();
+    const { recipeData, searchRecipe, loading, error, clearError, cancelRecipeExtraction } = useRecipe();
     const [query, setQuery] = useState('');
+
+    // Redirect to food-overview if recipe data exists (from localStorage or previous session)
+    useEffect(() => {
+        if (recipeData && !loading && !error) {
+            navigate("/food-overview");
+        }
+    }, [recipeData, loading, error, navigate]);
 
     const handleVideoSubmit = (val) => {
         setQuery(val);

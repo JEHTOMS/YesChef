@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
 import { useRecipe } from '../context/RecipeContext';
 import { LocationService } from '../services/locationService';
 import './Home.css';
@@ -12,6 +13,7 @@ import Directions from "../components/Directions";
 import Steps from "../components/Steps";
 
 function FoodInformation() {
+    const navigate = useNavigate();
     const { recipeData, getServingMultiplier, getDisplayName, getVideoDuration } = useRecipe();
     const [activeTab, setActiveTab] = useState('ingredients');
     const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
@@ -25,6 +27,13 @@ function FoodInformation() {
     const [allSelected, setAllSelected] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const toastTimerRef = useRef(null);
+
+    // Redirect to home if no recipe data is available
+    useEffect(() => {
+        if (!recipeData) {
+            navigate("/");
+        }
+    }, [recipeData, navigate]);
     
     // Get serving multiplier from context
     const servingMultiplier = getServingMultiplier();
@@ -178,6 +187,11 @@ function FoodInformation() {
         recipeData ? transformIngredients(recipeData.recipe?.ingredients || []) : []
     ), [recipeData]);
     const directions = recipeData ? transformDirections(recipeData.recipe?.steps || []) : [];
+
+    // Don't render anything if no recipe data (will redirect)
+    if (!recipeData) {
+        return null;
+    }
 
     return (
         <div className="page food-info-page">

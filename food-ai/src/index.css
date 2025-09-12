@@ -128,7 +128,7 @@ color:#000000;
 .footer{
   display: flex;
   width: 100%;
-  padding: 16px 16px 40px 16px;
+  padding: 16px 16px 24px 16px;
   justify-content: center;
   align-items: center;
   gap: 16px;

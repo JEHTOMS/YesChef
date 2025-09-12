@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { API_ENDPOINTS } from '../config.js';
 
 const RecipeContext = createContext();
@@ -11,16 +11,84 @@ export const useRecipe = () => {
     return context;
 };
 
+// LocalStorage keys for persistence
+const STORAGE_KEYS = {
+    RECIPE_DATA: 'yeschef_recipe_data',
+    SUBTITLE_DATA: 'yeschef_subtitle_data', 
+    ORIGINAL_QUERY: 'yeschef_original_query',
+    CURRENT_SERVINGS: 'yeschef_current_servings'
+};
+
+// Helper functions for localStorage
+const saveToStorage = (key, data) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+        console.warn('Failed to save to localStorage:', error);
+    }
+};
+
+const loadFromStorage = (key) => {
+    try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
+    } catch (error) {
+        console.warn('Failed to load from localStorage:', error);
+        return null;
+    }
+};
+
+const removeFromStorage = (key) => {
+    try {
+        localStorage.removeItem(key);
+    } catch (error) {
+        console.warn('Failed to remove from localStorage:', error);
+    }
+};
+
 export const RecipeProvider = ({ children }) => {
-    const [recipeData, setRecipeData] = useState(null);
-    const [subtitleData, setSubtitleData] = useState(null);
+    // Initialize state from localStorage if available
+    const [recipeData, setRecipeData] = useState(() => loadFromStorage(STORAGE_KEYS.RECIPE_DATA));
+    const [subtitleData, setSubtitleData] = useState(() => loadFromStorage(STORAGE_KEYS.SUBTITLE_DATA));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [originalQuery, setOriginalQuery] = useState(''); // Store the original user input
+    const [originalQuery, setOriginalQuery] = useState(() => loadFromStorage(STORAGE_KEYS.ORIGINAL_QUERY) || '');
     const abortRef = useRef(null); // Holds current AbortController for cancellation
     
-    // Serving size state management
-    const [currentServings, setCurrentServings] = useState(1);
+    // Serving size state management - restore from localStorage
+    const [currentServings, setCurrentServings] = useState(() => loadFromStorage(STORAGE_KEYS.CURRENT_SERVINGS) || 1);
+
+    // Persist recipe data to localStorage whenever it changes
+    useEffect(() => {
+        if (recipeData) {
+            saveToStorage(STORAGE_KEYS.RECIPE_DATA, recipeData);
+        } else {
+            removeFromStorage(STORAGE_KEYS.RECIPE_DATA);
+        }
+    }, [recipeData]);
+
+    // Persist subtitle data to localStorage whenever it changes
+    useEffect(() => {
+        if (subtitleData) {
+            saveToStorage(STORAGE_KEYS.SUBTITLE_DATA, subtitleData);
+        } else {
+            removeFromStorage(STORAGE_KEYS.SUBTITLE_DATA);
+        }
+    }, [subtitleData]);
+
+    // Persist original query to localStorage whenever it changes
+    useEffect(() => {
+        if (originalQuery) {
+            saveToStorage(STORAGE_KEYS.ORIGINAL_QUERY, originalQuery);
+        } else {
+            removeFromStorage(STORAGE_KEYS.ORIGINAL_QUERY);
+        }
+    }, [originalQuery]);
+
+    // Persist current servings to localStorage whenever it changes
+    useEffect(() => {
+        saveToStorage(STORAGE_KEYS.CURRENT_SERVINGS, currentServings);
+    }, [currentServings]);
     
     // Calculate serving multiplier
     const getServingMultiplier = () => {
@@ -169,6 +237,12 @@ export const RecipeProvider = ({ children }) => {
         setError(null);
         setOriginalQuery('');
         setCurrentServings(1); // Reset servings when clearing recipe
+        
+        // Clear localStorage when clearing recipe
+        removeFromStorage(STORAGE_KEYS.RECIPE_DATA);
+        removeFromStorage(STORAGE_KEYS.SUBTITLE_DATA);
+        removeFromStorage(STORAGE_KEYS.ORIGINAL_QUERY);
+        removeFromStorage(STORAGE_KEYS.CURRENT_SERVINGS);
     };
 
     // Calculate dynamic video duration from subtitle data

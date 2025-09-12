@@ -1,12 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRecipe } from '../context/RecipeContext';
 import '../pages/Home.css';
 import '../index.css';
 
 function Navbar({ showCloseButton = false, showBackButton = false, foodName = '', onBack }) {
     const navigate = useNavigate();
+    const { clearRecipe } = useRecipe();
 
     const handleCloseClick = () => {
+        clearRecipe(); // Clear recipe data and localStorage
         navigate('/');
     };
 
