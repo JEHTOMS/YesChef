@@ -37,26 +37,27 @@ function FoodOverview() {
             <Navbar showCloseButton={true}/>
             <div className="page">
                 <div className="main-content pd-240">
-                     <div className="container layout-sm">
-                     <FoodHero 
-                        image={recipe.image} 
-                        name={getDisplayName()}
-                        videolink={recipeData.videoId ? `https://www.youtube.com/watch?v=${recipeData.videoId}` : null} 
-                     />
-                     <FoodDetails 
-                        description={recipe.description}
-                        cookingTime={recipe.cookTime}
-                        servings={recipe.servings}
-                        difficulty={recipe.difficulty}
-                        calories={recipe.calories}
-                     />
-                     <ToNote 
-                        tools={recipe.tools || []} 
-                        allergens={recipe.allergens || []} 
-                     />
-                 </div>
+                    <div className="container layout-sm">
+                        <FoodHero 
+                            image={recipe.image} 
+                            name={getDisplayName()}
+                            videolink={recipeData.videoId ? `https://www.youtube.com/watch?v=${recipeData.videoId}` : null} 
+                        />
+                        <FoodDetails 
+                            description={recipe.description}
+                            cookingTime={recipe.cookTime}
+                            servings={recipe.servings}
+                            difficulty={recipe.difficulty}
+                            calories={recipe.calories}
+                        />
+                        <ToNote 
+                            tools={recipe.tools || []} 
+                            allergens={recipe.allergens || []} 
+                        />
+                    </div>
+                </div>
+                <Footer buttonType="primary" primaryButtonText="Start Cooking" onTap={startCooking} />
             </div>
-            <Footer buttonType="primary" primaryButtonText="Start Cooking" onTap={startCooking} />
         </div>
     );
 }
