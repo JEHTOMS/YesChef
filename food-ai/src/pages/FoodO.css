@@ -1,8 +1,3 @@
-/* Ensure content doesn't get hidden behind sticky navbar */
-.page {
-    padding-top: 48px; /* navbar height + padding */
-}
-
 #food-image{
     width: 100%;
     height: 420px;
