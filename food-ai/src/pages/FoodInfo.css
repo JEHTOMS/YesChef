@@ -303,7 +303,7 @@ input[type="checkbox"]:hover {
 
 /* Extra-safe spacing on pages with segmented controls header inside FoodInformation */
 .food-info-page .main-content.with-segmented-controls {
-  padding-top: 156px; /* account for navbar + segmented controls stack */
+  padding-top: 220px; /* account for navbar + segmented controls stack */
 }
 
 .ingredient-container {
