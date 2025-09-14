@@ -39,10 +39,11 @@ function ToNote({ tools = [], allergens = [] }) {
                         </div>
                     </div>
                     <ul className="allergen-list">
-                        {allergens.map((allergen, index) => (
+                        {allergens.filter(allergen => allergen.toLowerCase() !== 'none').map((allergen, index) => (
                             <li key={index} className="allergen-item text-sm">{allergen}</li>
                         ))}
                     </ul>
+                    {(allergens.length === 0 || allergens.every(allergen => allergen.toLowerCase() === 'none')) && <div className="emptyState"><p>No potential allergens</p></div>}
                 </div>
             </div>
         </div>

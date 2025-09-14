@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Allergen None Logic</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-case {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007acc;
+        }
+        .emptyState {
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+            color: #666;
+            background-color: #f9f9f9;
+            margin-top: 10px;
+        }
+        .allergen-item {
+            padding: 4px 8px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            margin: 2px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Testing Allergen None Logic</h1>
+    
+    <div class="test-case">
+        <h3>Test Case 1: Empty array []</h3>
+        <div id="test1"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 2: Array with "none" ["none"]</h3>
+        <div id="test2"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 3: Array with "None" (capital) ["None"]</h3>
+        <div id="test3"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 4: Array with real allergens ["nuts", "dairy"]</h3>
+        <div id="test4"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 5: Mixed array with none ["none", "dairy"]</h3>
+        <div id="test5"></div>
+    </div>
+
+    <script>
+        function testAllergenLogic(allergens, containerId) {
+            const container = document.getElementById(containerId);
+            
+            // Filter out "none" allergens
+            const validAllergens = allergens.filter(allergen => allergen.toLowerCase() !== 'none');
+            
+            // Check if should show empty state
+            const shouldShowEmptyState = allergens.length === 0 || allergens.every(allergen => allergen.toLowerCase() === 'none');
+            
+            let html = `<p><strong>Input:</strong> ${JSON.stringify(allergens)}</p>`;
+            html += `<p><strong>Valid allergens:</strong> ${JSON.stringify(validAllergens)}</p>`;
+            html += `<p><strong>Show empty state:</strong> ${shouldShowEmptyState}</p>`;
+            
+            if (validAllergens.length > 0) {
+                html += '<div>Allergen items: ';
+                validAllergens.forEach(allergen => {
+                    html += `<span class="allergen-item">${allergen}</span>`;
+                });
+                html += '</div>';
+            }
+            
+            if (shouldShowEmptyState) {
+                html += '<div class="emptyState"><p>No potential allergens</p></div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Run tests
+        testAllergenLogic([], 'test1');
+        testAllergenLogic(['none'], 'test2');
+        testAllergenLogic(['None'], 'test3');
+        testAllergenLogic(['nuts', 'dairy'], 'test4');
+        testAllergenLogic(['none', 'dairy'], 'test5');
+    </script>
+</body>
+</html>

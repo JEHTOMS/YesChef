@@ -32,7 +32,7 @@ function LoadingOverlay({
         alignItems: 'center',
         gap: '32px',
         background: 'white',
-        borderRadius: '16px',
+        borderRadius: '24px',
         padding: '32px'
     };
 
