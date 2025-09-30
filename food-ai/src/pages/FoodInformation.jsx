@@ -14,7 +14,7 @@ import Steps from "../components/Steps";
 
 function FoodInformation() {
     const navigate = useNavigate();
-    const { recipeData, getServingMultiplier, getDisplayName, getVideoDuration } = useRecipe();
+    const { recipeData, subtitleData, getServingMultiplier, getDisplayName, getVideoDuration } = useRecipe();
     const [activeTab, setActiveTab] = useState('ingredients');
     const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
     const [isModalClosing, setIsModalClosing] = useState(false);
@@ -157,15 +157,35 @@ function FoodInformation() {
                     return null; // No video available
                 }
 
-                // Create YouTube link with estimated timestamp
-                // Fix alignment: step content appears one position later in video
-                const baseOffset = 30; // Skip intro
-                const stepInterval = 90; // 1.5 minutes per step
+                const totalSteps = apiSteps.length;
+                const hasTranscript = subtitleData?.subtitles && subtitleData.subtitles.length > 0;
                 const maxVideoTime = getVideoDuration(); // Dynamic video duration
                 
-                // Add 1 to stepIndex to align with video content timing
-                let adjustedIndex = stepIndex + 1;
-                let estimatedSeconds = baseOffset + (adjustedIndex * stepInterval);
+                let estimatedSeconds;
+                
+                if (hasTranscript) {
+                    // Use transcript-based timing when available
+                    const baseOffset = 30; // Skip intro
+                    const stepInterval = 90; // 1.5 minutes per step
+                    
+                    // Add 1 to stepIndex to align with video content timing
+                    let adjustedIndex = stepIndex + 1;
+                    estimatedSeconds = baseOffset + (adjustedIndex * stepInterval);
+                } else {
+                    // Fallback: Use percentage-based video scrubbing for videos without transcripts
+                    const videoStartPercentage = 0.1; // Start at 10% to skip intro
+                    const videoEndPercentage = 0.9; // End at 90% to avoid outro
+                    const usableVideoRange = videoEndPercentage - videoStartPercentage;
+                    
+                    // Calculate step percentage within the usable range
+                    const stepPercentage = totalSteps > 1 
+                        ? (stepIndex / (totalSteps - 1)) * usableVideoRange + videoStartPercentage
+                        : videoStartPercentage + (usableVideoRange / 2);
+                    
+                    estimatedSeconds = Math.round(maxVideoTime * stepPercentage);
+                }
+                
+                // Ensure we don't exceed video duration
                 estimatedSeconds = Math.min(estimatedSeconds, maxVideoTime);
                 
                 return `https://www.youtube.com/watch?v=${videoId}&t=${estimatedSeconds}s`;

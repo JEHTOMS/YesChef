@@ -52,6 +52,10 @@ font-weight: 400;
 line-height: 124%; /* 39.6px */
 letter-spacing: -1.08px;
 text-align: left;
+ /* Ensure titles wrap on all screen sizes */
+ white-space: normal;
+ overflow-wrap: anywhere;
+ word-break: break-word;
 }
 .text-subtitle{
   font-family: "Shippori Antique B1";

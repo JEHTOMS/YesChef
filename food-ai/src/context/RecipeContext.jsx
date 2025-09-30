@@ -248,7 +248,31 @@ export const RecipeProvider = ({ children }) => {
     // Calculate dynamic video duration from subtitle data
     const getVideoDuration = () => {
         if (!subtitleData?.subtitles || subtitleData.subtitles.length === 0) {
-            return 1200; // Fallback to 20 minutes if no subtitle data
+            // Intelligent fallback based on recipe complexity when no subtitle data
+            const steps = recipeData?.recipe?.steps || [];
+            const ingredients = recipeData?.recipe?.ingredients || [];
+            
+            // Base duration estimation algorithm
+            let estimatedDuration = 300; // 5 minutes base
+            
+            // Add time based on number of steps (1.5 minutes per step)
+            estimatedDuration += steps.length * 90;
+            
+            // Add time based on ingredient complexity (0.5 minutes per ingredient)
+            estimatedDuration += ingredients.length * 30;
+            
+            // Apply cooking method multipliers
+            const recipeText = JSON.stringify(recipeData.recipe || {}).toLowerCase();
+            if (recipeText.includes('bake') || recipeText.includes('roast')) {
+                estimatedDuration *= 1.8; // Baking videos tend to be longer
+            } else if (recipeText.includes('fry') || recipeText.includes('sauté')) {
+                estimatedDuration *= 1.2; // Quick cooking methods
+            } else if (recipeText.includes('slow cook') || recipeText.includes('braise')) {
+                estimatedDuration *= 2.5; // Slow cooking videos show more steps
+            }
+            
+            // Cap between 5 minutes and 45 minutes for reasonable bounds
+            return Math.max(300, Math.min(2700, Math.round(estimatedDuration)));
         }
         
         const lastSubtitle = subtitleData.subtitles[subtitleData.subtitles.length - 1];
@@ -260,6 +284,57 @@ export const RecipeProvider = ({ children }) => {
         setError(null);
     };
 
+    // Extract food name from URL paths for display purposes
+    const extractFoodNameFromUrl = (url) => {
+        if (!url || typeof url !== 'string') return '';
+        
+        try {
+            const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+            const pathname = urlObj.pathname;
+            
+            // Split path into segments and find meaningful food-related parts
+            const segments = pathname.split('/').filter(Boolean);
+            
+            // Common URL segments to ignore
+            const ignoreSegments = new Set([
+                'recipe', 'recipes', 'food', 'cooking', 'kitchen', 
+                'dish', 'dishes', 'article', 'post', 'blog',
+                'watch', 'v', 'embed', 'video', 'videos'
+            ]);
+            
+            // Find the most meaningful segment (usually the recipe name)
+            let foodName = '';
+            for (const segment of segments) {
+                const cleaned = decodeURIComponent(segment)
+                    .replace(/[-_]/g, ' ')
+                    .replace(/\d+/g, '') // remove numbers
+                    .trim()
+                    .toLowerCase();
+                
+                // Skip if it's an ignored segment or too short
+                if (ignoreSegments.has(cleaned) || cleaned.length < 3) continue;
+                
+                // If this looks like a food name (has letters), use it
+                if (/[a-z]/.test(cleaned) && cleaned.length > foodName.length) {
+                    foodName = cleaned;
+                }
+            }
+            
+            // Clean up and format the food name
+            if (foodName) {
+                return foodName
+                    .split(' ')
+                    .filter(word => word.length > 0)
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+            }
+            
+            return '';
+        } catch (error) {
+            return '';
+        }
+    };
+
     // Helper function to get the best display name for the recipe
     const getDisplayName = () => {
         if (!recipeData) return '';
@@ -268,8 +343,17 @@ export const RecipeProvider = ({ children }) => {
         
         if (isYouTubeInput) {
             // For YouTube links, prioritize the recipe name extracted from the video content
-            return recipeData.recipe?.title || 'Unknown Recipe';
+            return recipeData.recipe?.title || recipeData.videoTitle || 'Unknown Recipe';
         } else {
+            // Check if original query is a URL
+            const isUrl = originalQuery.includes('://') || originalQuery.includes('www.');
+            
+            if (isUrl) {
+                // Extract food name from URL first, fallback to recipe title
+                const urlFoodName = extractFoodNameFromUrl(originalQuery);
+                if (urlFoodName) return urlFoodName;
+            }
+            
             // For text input, use the original query if it's more descriptive, fallback to recipe title
             const userInput = originalQuery.trim();
             const extractedTitle = recipeData.recipe?.title;

@@ -98,6 +98,7 @@ const Ingredients = forwardRef(({ ingredients: initialIngredients, servingMultip
                                 <span className="ingredient-name text-lg" style={{ textTransform: 'capitalize' }}>{ingredient.name}</span>
                                 <span className="ingredient-quantity text-sm">
                                     <span className="amount">{ingredient.quantity}</span>
+                                    {ingredient.quantity && ingredient.unit ? <span aria-hidden="true">&nbsp;</span> : null}
                                     <span className="unit">{ingredient.unit}</span>
                                     {ingredient.needsManualScaling && (
                                         <span className="scaling-note" style={{ 
