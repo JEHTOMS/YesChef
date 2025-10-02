@@ -29,8 +29,16 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      if('%REACT_APP_GA_MEASUREMENT_ID%' !== '%REACT_APP_GA_MEASUREMENT_ID%') {
-        gtag('config', '%REACT_APP_GA_MEASUREMENT_ID%');
+      
+      // Only initialize GA if measurement ID is provided and not a placeholder
+      if('%REACT_APP_GA_MEASUREMENT_ID%' && '%REACT_APP_GA_MEASUREMENT_ID%' !== '%REACT_APP_GA_MEASUREMENT_ID%' && !('%REACT_APP_GA_MEASUREMENT_ID%'.includes('XXXXXXXXXX'))) {
+        gtag('config', '%REACT_APP_GA_MEASUREMENT_ID%', {
+          page_title: 'YesChef - Smart Recipe Extraction',
+          custom_map: {
+            'custom_parameter_1': 'recipe_source',
+            'custom_parameter_2': 'user_journey'
+          }
+        });
       }
     </script>
     
