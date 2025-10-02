@@ -48,7 +48,7 @@ function Home() {
                  <div className="container layout-sm">
                     <div className="input-wrapper">
                         <Input onRecipeSubmit={handleVideoSubmit} />
-                        <p className="description text-sm">Create recipe from a link or text.</p>
+                        <p className="description text-sm">Create recipe from a text or YouTube link.</p>
                     </div>
                  </div>
             </div>

@@ -1,11 +1,26 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "YesChef",
+  "name": "YesChef - Smart Recipe Extraction",
   "icons": [
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
+    },
+    {
+      "src": "Fav16px.svg",
+      "type": "image/svg+xml",
+      "sizes": "16x16"
+    },
+    {
+      "src": "Fav32px.svg",
+      "type": "image/svg+xml",
+      "sizes": "32x32"
+    },
+    {
+      "src": "Fav180px.svg",
+      "type": "image/svg+xml",
+      "sizes": "180x180"
     },
     {
       "src": "logo192.png",
@@ -20,6 +35,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#F04DCC",
+  "background_color": "#F7F7F7"
 }

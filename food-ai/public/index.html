@@ -2,17 +2,41 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    
+    <!-- Modern SVG Favicon (preferred by modern browsers) -->
+    <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/Fav32px.svg" />
+    
+    <!-- Fallback ICO for older browsers -->
+    <link rel="icon" type="image/x-icon" href="%PUBLIC_URL%/favicon.ico" />
+    
+    <!-- Multiple sizes for different contexts -->
+    <link rel="icon" type="image/svg+xml" sizes="16x16" href="%PUBLIC_URL%/Fav16px.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="32x32" href="%PUBLIC_URL%/Fav32px.svg" />
+    
+    <!-- Apple Touch Icon (iOS devices) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/Fav180px.svg" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="YesChef - Transform YouTube cooking videos and recipe links into structured, easy-to-follow recipes with timers and step-by-step guidance."
     />
+    
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=%REACT_APP_GA_MEASUREMENT_ID%"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      if('%REACT_APP_GA_MEASUREMENT_ID%' !== '%REACT_APP_GA_MEASUREMENT_ID%') {
+        gtag('config', '%REACT_APP_GA_MEASUREMENT_ID%');
+      }
+    </script>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Antique+B1&display=swap" rel="stylesheet">
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
@@ -27,7 +51,7 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>React App</title>
+    <title>YesChef - Smart Recipe Extraction from YouTube & Recipe Sites</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

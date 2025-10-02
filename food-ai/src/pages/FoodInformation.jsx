@@ -246,7 +246,7 @@ function FoodInformation() {
                     {activeTab === 'ingredients' ? (
                         <div className="ingredient-container">
                             <div className="ingredient-title">
-                                <div className="ingredient-text"><h4 className="ingredient-heading">Get Ingredients</h4><p className="ingredient-subheading">Select the ingredients you don’t have to see nearby store options or copy them to your list.</p></div>
+                                <div className="ingredient-text"><h4 className="ingredient-heading">Get Ingredients</h4><p className="ingredient-subheading">Select the ingredients you have missing to view nearby store options or add to your list.</p></div>
                                 <button 
                                     className="ingredient-select-button" 
                                     id="select-all"
