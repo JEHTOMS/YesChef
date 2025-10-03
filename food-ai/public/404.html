@@ -3,17 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <title>Redirecting...</title>
-    <meta http-equiv="refresh" content="0; url=%PUBLIC_URL%/index.html" />
+    <meta http-equiv="refresh" content="0; url=/index.html" />
   </head>
   <body>
     <script>
       // Single Page Apps for GitHub Pages redirect script
-      // https://github.com/rafgraph/spa-github-pages
+      // Simplified for custom domain hosting
       (function(l) {
-        var pathSegmentsToKeep = 1; // keeps "/YesChef" when hosted at /YesChef/
-        var l = window.location;
-        var path = l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/';
-        l.replace(path + (l.search ? l.search + '&' : '?') + 'p=' + (l.pathname + l.search + l.hash).slice(1));
+        l.replace('/' + (l.search ? l.search + '&' : '?') + 'p=' + (l.pathname + l.search + l.hash).slice(1));
       })(window.location);
     </script>
     <noscript>
