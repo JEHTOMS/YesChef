@@ -9,7 +9,7 @@ import './App.css';
 function App() {
   return (
     <RecipeProvider>
-      <Router basename={process.env.PUBLIC_URL}>
+      <Router>
         <div className="App">
           <Routes>
             <Route path="/" element={<Home />} />
