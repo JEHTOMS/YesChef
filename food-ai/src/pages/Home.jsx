@@ -47,7 +47,11 @@ function Home() {
             <div className="main-content">
                  <div className="container layout-sm">
                     <div className="input-wrapper">
-                        <Input onRecipeSubmit={handleVideoSubmit} />
+                                    <Input 
+                onRecipeSubmit={handleVideoSubmit} 
+                onSubmit={handleExtractRecipe}
+                isLoading={loading}
+            />
                         <p className="description text-sm">Create recipe from a text or YouTube link.</p>
                     </div>
                  </div>

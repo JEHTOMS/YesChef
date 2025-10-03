@@ -2,7 +2,7 @@ import { useState } from 'react';
 import '../pages/Home.css';
 import '../index.css';
 
-function Input({ onRecipeSubmit, isLoading }) {
+function Input({ onRecipeSubmit, onSubmit, isLoading }) {
     const [videoUrl, setVideoUrl] = useState('');
 
     // Determine meal period based on local time
@@ -22,11 +22,21 @@ function Input({ onRecipeSubmit, isLoading }) {
         }
     };
 
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault(); // Prevent new line
+            if (videoUrl.trim() && onSubmit && !isLoading) {
+                onSubmit();
+            }
+        }
+    };
+
     return (
         <div className="input-container">
             <textarea 
                 value={videoUrl}
                 onChange={handleInputChange}
+                onKeyPress={handleKeyPress}
                 className="input-field title" 
                 id="food-query" 
                 placeholder={`What are you making for ${mealTime}?`}
