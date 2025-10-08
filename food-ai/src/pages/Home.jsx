@@ -21,6 +21,14 @@ function Home() {
         }
     }, [recipeData, loading, error, navigate]);
 
+    // Reset scroll position when component mounts
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        // Also reset any scrollable containers
+        document.body.scrollTop = 0; // For Safari
+        document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }, []);
+
     const handleVideoSubmit = (val) => {
         setQuery(val);
     };
