@@ -86,11 +86,14 @@ function Navbar({ showCloseButton = false, showBackButton = false, foodName = ''
                             <h2 className='foodName' style={{ fontWeight: '500' }}>{foodName}</h2>
                         </div>
                         <button 
-                            className="feedback-button" 
+                            className="feedback-button feedback-button-food-info" 
                             onClick={handleFeedbackClick}
                             data-email="ajetomobideji@gmail.com"
                         >
-                            Got feedback?
+                            <span className="feedback-text">Got feedback?</span>
+                            <svg className="feedback-icon" width="25" height="24" viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22.5 6C22.5 4.9 21.6 4 20.5 4H4.5C3.4 4 2.5 4.9 2.5 6M22.5 6V18C22.5 19.1 21.6 20 20.5 20H4.5C3.4 20 2.5 19.1 2.5 18V6M22.5 6L12.5 13L2.5 6" stroke="#1E1E1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
                             <span className="feedback-tooltip">ajetomobideji@gmail.com</span>
                         </button>
                     </>

@@ -59,6 +59,7 @@ position: relative;
   z-index: 1002;
   cursor: text;
   user-select: text;
+  display: none; /* Hide on mobile by default */
 }
 
 /* Arrow for video link tooltip */
@@ -72,11 +73,17 @@ position: relative;
   border-bottom-color: #1E1E1E;
 }
 
-/* Show tooltip instantly on hover */
-.icon-button:hover .video-link-tooltip,
-.video-link-tooltip:hover {
-  opacity: 1;
-  transition: none;
+/* Show tooltip on desktop only (min-width: 640px) */
+@media (min-width: 640px) {
+  .video-link-tooltip {
+    display: block;
+  }
+  
+  .icon-button:hover .video-link-tooltip,
+  .video-link-tooltip:hover {
+    opacity: 1;
+    transition: none;
+  }
 }
 
 .food-details{
