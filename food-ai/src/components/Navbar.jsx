@@ -4,7 +4,7 @@ import { useRecipe } from '../context/RecipeContext';
 import '../pages/Home.css';
 import '../index.css';
 
-function Navbar({ showCloseButton = false, showBackButton = false, foodName = '', onBack }) {
+function Navbar({ showCloseButton = false, showBackButton = false, foodName = '', onBack, showFeedbackButton = true }) {
     const navigate = useNavigate();
     const { clearRecipe } = useRecipe();
 
@@ -21,12 +21,19 @@ function Navbar({ showCloseButton = false, showBackButton = false, foodName = ''
         }
     };
 
+    const handleFeedbackClick = (e) => {
+        e.preventDefault();
+        const email = 'ajetomobideji@gmail.com';
+        const subject = 'YesChef Feedback';
+        window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+    };
+
     const renderLogo = !showBackButton; // hide logo when back button variant
     const renderClose = showCloseButton && !showBackButton; // hide close when back shown
 
     return (
         <div className="nav-bar">
-            <div className="nav-container">
+            <div className={`nav-container ${showBackButton ? 'food-info-nav' : ''}`}>
                 {renderLogo && (
                     <svg width="118" height="37" viewBox="0 0 118 37" fill="none" xmlns="http://www.w3.org/2000/svg">
 <rect width="118" height="37" rx="8" fill="#FFD5F6"/>
@@ -34,24 +41,59 @@ function Navbar({ showCloseButton = false, showBackButton = false, foodName = ''
 </svg>
 
                 )}
+
+                {/* Home page: Only feedback button (if showFeedbackButton is true and not on FoodOverview) */}
+                {renderLogo && showFeedbackButton && !showCloseButton && (
+                    <button 
+                        className="feedback-button" 
+                        onClick={handleFeedbackClick}
+                        data-email="ajetomobideji@gmail.com"
+                    >
+                        Got feedback?
+                        <span className="feedback-tooltip">ajetomobideji@gmail.com</span>
+                    </button>
+                )}
+
+                {/* FoodOverview page: Feedback button and close button in a container with gap */}
                 {renderClose && (
-                    <button className="close-button icon-button" id="close-button" onClick={handleCloseClick}>
-                        <svg width="25" height="25" viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M18.5 6.5L6.5 18.5M6.5 6.5L18.5 18.5" stroke="#1E1E1E" strokeWidth="2.8125" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </button>
-                )}
-                {showBackButton && (
-                    <button className="back-button icon-button" id="back-button" onClick={handleBackClick}>
-                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M16.875 9H1.125M1.125 9L9 16.875M1.125 9L9 1.125" stroke="#1E1E1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </button>
-                )}
-                {showBackButton && (
-                    <div className='foodNameContainer'>
-                        <h2 className='foodName'style={{ fontWeight: '500' }}>{foodName}</h2>
+                    <div className="nav-buttons-container">
+                        <button 
+                            className="feedback-button" 
+                            onClick={handleFeedbackClick}
+                            data-email="ajetomobideji@gmail.com"
+                        >
+                            Got feedback?
+                            <span className="feedback-tooltip">ajetomobideji@gmail.com</span>
+                        </button>
+                        <button className="close-button icon-button" id="close-button" onClick={handleCloseClick}>
+                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20.75 7.25L7.25 20.75M7.25 7.25L20.75 20.75" stroke="#1E1E1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+
+                        </button>
                     </div>
+                )}
+
+                {/* FoodInformation page: Back button, food name, and feedback button */}
+                {showBackButton && (
+                    <>
+                        <button className="back-button icon-button" id="back-button" onClick={handleBackClick}>
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M16.875 9H1.125M1.125 9L9 16.875M1.125 9L9 1.125" stroke="#1E1E1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </button>
+                        <div className='foodNameContainer'>
+                            <h2 className='foodName' style={{ fontWeight: '500' }}>{foodName}</h2>
+                        </div>
+                        <button 
+                            className="feedback-button" 
+                            onClick={handleFeedbackClick}
+                            data-email="ajetomobideji@gmail.com"
+                        >
+                            Got feedback?
+                            <span className="feedback-tooltip">ajetomobideji@gmail.com</span>
+                        </button>
+                    </>
                 )}
             </div>
         </div>

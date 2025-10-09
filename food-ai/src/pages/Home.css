@@ -32,6 +32,84 @@ position: relative;
   left: 16px;
 }
 
+.feedback-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  height: 40px;
+  border-radius: 50px;
+  background: rgba(58, 58, 58, 0.06);
+  border: none;
+  color: #1E1E1E;
+  font-family: "Shippori Antique B1";
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 110%;
+  letter-spacing: -0.32px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-wrap: nowrap;
+  white-space: nowrap;
+  position: relative;
+}
+
+.feedback-button:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Custom tooltip for instant appearance */
+.feedback-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1E1E1E;
+  color: #FFFFFF;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: auto;
+  opacity: 0;
+  transition: none; /* Instant transition */
+  z-index: 1002;
+  cursor: text;
+  user-select: text;
+}
+
+/* Arrow for tooltip */
+.feedback-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #1E1E1E;
+}
+
+/* Show tooltip instantly on hover */
+.feedback-button:hover .feedback-tooltip,
+.feedback-tooltip:hover {
+  opacity: 1;
+  transition: none; /* Instant appearance */
+}
+
+/* Absolute positioning for feedback button on FoodInformation page */
+.nav-container.food-info-nav .feedback-button {
+  position: absolute;
+  right: 0;
+}
+
+.nav-buttons-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .foodNameContainer {
   display: flex;
   padding: 7px 8px 8px 8px;
@@ -47,7 +125,6 @@ position: relative;
   letter-spacing: -0.6px;
   position: absolute;
   left: 50%;
-  top: 0;
   transform: translateX(-50%);
   /* Ensure it sits above background but below buttons if needed */
   z-index: 1;

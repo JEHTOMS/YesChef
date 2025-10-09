@@ -36,6 +36,7 @@ function FoodHero({ image, name, videolink }) {
                                 <path d="M15 7H17C18.3261 7 19.5979 7.52678 20.5355 8.46447C21.4732 9.40215 22 10.6739 22 12C22 13.3261 21.4732 14.5979 20.5355 15.5355C19.5979 16.4732 18.3261 17 17 17H15" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M8 12H16" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
+                            <span className="video-link-tooltip">YouTube.com</span>
                         </div>
                     </a>
                 )}

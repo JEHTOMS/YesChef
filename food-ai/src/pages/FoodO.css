@@ -33,10 +33,50 @@ background: rgba(58, 58, 58, 0.06);
 text-decoration: none;
 color: black;
 border: none;
+position: relative;
 }
 
 .icon-button:hover {
     background: rgba(0, 0, 0, 0.2);
+}
+
+/* Video link tooltip */
+.video-link-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1E1E1E;
+  color: #FFFFFF;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: auto;
+  opacity: 0;
+  transition: none;
+  z-index: 1002;
+  cursor: text;
+  user-select: text;
+}
+
+/* Arrow for video link tooltip */
+.video-link-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #1E1E1E;
+}
+
+/* Show tooltip instantly on hover */
+.icon-button:hover .video-link-tooltip,
+.video-link-tooltip:hover {
+  opacity: 1;
+  transition: none;
 }
 
 .food-details{
