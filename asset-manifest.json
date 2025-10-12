@@ -1,16 +1,16 @@
 {
   "files": {
-    "main.css": "/YesChef/static/css/main.5883fa4b.css",
-    "main.js": "/YesChef/static/js/main.34d9c0a3.js",
-    "static/js/453.52cf7b0c.chunk.js": "/YesChef/static/js/453.52cf7b0c.chunk.js",
-    "static/media/alarm-clock-short-6402.mp3": "/YesChef/static/media/alarm-clock-short-6402.e79e0abb7c74667ec9d7.mp3",
-    "index.html": "/YesChef/index.html",
-    "main.5883fa4b.css.map": "/YesChef/static/css/main.5883fa4b.css.map",
-    "main.34d9c0a3.js.map": "/YesChef/static/js/main.34d9c0a3.js.map",
-    "453.52cf7b0c.chunk.js.map": "/YesChef/static/js/453.52cf7b0c.chunk.js.map"
+    "main.css": "/static/css/main.1609f527.css",
+    "main.js": "/static/js/main.15b85014.js",
+    "static/js/453.52cf7b0c.chunk.js": "/static/js/453.52cf7b0c.chunk.js",
+    "static/media/alarm-clock-short-6402.mp3": "/static/media/alarm-clock-short-6402.e79e0abb7c74667ec9d7.mp3",
+    "index.html": "/index.html",
+    "main.1609f527.css.map": "/static/css/main.1609f527.css.map",
+    "main.15b85014.js.map": "/static/js/main.15b85014.js.map",
+    "453.52cf7b0c.chunk.js.map": "/static/js/453.52cf7b0c.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.5883fa4b.css",
-    "static/js/main.34d9c0a3.js"
+    "static/css/main.1609f527.css",
+    "static/js/main.15b85014.js"
   ]
 }

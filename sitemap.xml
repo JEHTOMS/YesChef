@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
+  <!-- Homepage -->
+  <url>
+    <loc>https://www.yescheff.co/</loc>
+    <lastmod>2025-10-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://www.yescheff.co/Fav180px.svg</image:loc>
+      <image:title>YesChef - Smart Recipe Extraction</image:title>
+      <image:caption>Transform YouTube cooking videos and recipe links into structured recipes</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- Food Overview Page -->
+  <url>
+    <loc>https://www.yescheff.co/food-overview</loc>
+    <lastmod>2025-10-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Food Information Page -->
+  <url>
+    <loc>https://www.yescheff.co/food-information</loc>
+    <lastmod>2025-10-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+</urlset>

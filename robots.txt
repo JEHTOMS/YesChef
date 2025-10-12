@@ -1,3 +1,9 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+
+# Sitemap location
+Sitemap: https://www.yescheff.co/sitemap.xml
+
+# Crawl-delay (optional - helps prevent overwhelming your server)
+Crawl-delay: 1
