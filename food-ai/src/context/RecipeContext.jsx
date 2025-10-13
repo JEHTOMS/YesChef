@@ -202,9 +202,22 @@ export const RecipeProvider = ({ children }) => {
                 // Silently handle cancellations
                 return null;
             }
+            
             console.error('Recipe extraction error:', err);
-            setError(err.message);
-            throw err;
+            
+            // Enhanced error messages for better user experience
+            let userFriendlyError = err.message;
+            
+            if (err.message.includes('rate limit') || err.message.includes('429')) {
+                userFriendlyError = 'Too many requests at the moment. Please try again later.';
+            } else if (err.message.includes('Internal server error')) {
+                userFriendlyError = 'Too many requests at the moment. Please try again later.';
+            } else if (err.message.includes('network') || err.message.includes('fetch')) {
+                userFriendlyError = 'Network error occurred. Please check your connection and try again.';
+            }
+            
+            setError(userFriendlyError);
+            throw new Error(userFriendlyError);
         } finally {
             // Only clear loading if this controller is still the active one (avoid race)
             if (abortRef.current === controller) {

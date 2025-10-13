@@ -5,6 +5,78 @@ import { OPENAI_CONFIG } from './config.js';
 // Add fetch polyfill
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
+// Enhanced error logging helper
+function logError(context, error, additionalInfo = {}) {
+  console.error(`[${context}] Error:`, {
+    message: error.message,
+    stack: error.stack,
+    ...additionalInfo,
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Rate limiting helper with exponential backoff
+async function callOpenAIWithRetry(openaiFunction, maxRetries = 3, initialDelay = 1000) {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[OpenAI] Attempt ${attempt}/${maxRetries}`);
+      return await openaiFunction();
+    } catch (error) {
+      lastError = error;
+      
+      // Check if it's a rate limit error
+      if (error.status === 429 || error.message.includes('rate limit') || error.message.includes('quota')) {
+        const delay = initialDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.warn(`[OpenAI] Rate limit hit, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      // For non-rate-limit errors, don't retry
+      if (attempt === 1 && !error.message.includes('rate limit')) {
+        console.error(`[OpenAI] Non-retryable error:`, error.message);
+        throw error;
+      }
+      
+      // Last attempt failed
+      if (attempt === maxRetries) {
+        console.error(`[OpenAI] All ${maxRetries} attempts failed`);
+        throw lastError;
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+// API key validation helper
+function validateApiKeys() {
+  const issues = [];
+  
+  if (!process.env.OPENAI_API_KEY) {
+    issues.push('OPENAI_API_KEY is required for recipe processing');
+  }
+  
+  if (!process.env.YOUTUBE_API_KEY) {
+    issues.push('YOUTUBE_API_KEY is required for video search (optional but recommended)');
+  }
+  
+  if (!process.env.GOOGLE_API_KEY) {
+    issues.push('GOOGLE_API_KEY is required for image search (optional but recommended)');
+  }
+  
+  if (!process.env.GOOGLE_SEARCH_ENGINE_ID) {
+    issues.push('GOOGLE_SEARCH_ENGINE_ID is required for image search (optional but recommended)');
+  }
+  
+  return issues;
+}
+
 // Validate if input is food-related using OpenAI
 async function validateFoodInput(query) {
   try {
@@ -30,11 +102,13 @@ NOT food-related if it's:
 
 Be strict - only return isFood: false with high confidence (>0.8) if you're absolutely certain it's not food-related.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: 100,
+    const response = await callOpenAIWithRetry(async () => {
+      return await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 100,
+      });
     });
 
     const content = response.choices[0]?.message?.content?.trim();
@@ -65,6 +139,13 @@ Be strict - only return isFood: false with high confidence (>0.8) if you're abso
 export async function recipeHandler(requestData) {
   try {
     console.log('Recipe handler received data:', JSON.stringify(requestData, null, 2));
+    console.log('⚠️  [RATE LIMIT WARNING] This app makes 2-3 OpenAI API calls per recipe request');
+    
+    // Validate API keys and log issues
+    const apiKeyIssues = validateApiKeys();
+    if (apiKeyIssues.length > 0) {
+      console.warn('API Key Issues:', apiKeyIssues);
+    }
     
     // Handle food validation requests
     if (requestData.validateOnly) {
@@ -79,13 +160,20 @@ export async function recipeHandler(requestData) {
       };
     }
     
-    // Verify API key exists
+    // Verify critical API key exists
     if (!process.env.OPENAI_API_KEY) {
-      console.error('OpenAI API key not found');
+      logError('API_VALIDATION', new Error('OpenAI API key missing'), { 
+        required: 'OPENAI_API_KEY',
+        provided: !!process.env.OPENAI_API_KEY
+      });
       return {
-        statusCode: 400,
+        statusCode: 401,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: false, error: 'OpenAI API key not configured' }),
+        body: JSON.stringify({ 
+          success: false, 
+          error: 'OpenAI API key not configured - please add OPENAI_API_KEY to your environment variables',
+          details: 'Missing OPENAI_API_KEY environment variable'
+        }),
       };
     }
 
@@ -212,14 +300,43 @@ export async function recipeHandler(requestData) {
     };
 
   } catch (error) {
-    console.error('Recipe handler error:', error);
+    logError('RECIPE_HANDLER', error, { 
+      requestData: requestData,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+      hasYouTubeKey: !!process.env.YOUTUBE_API_KEY,
+      hasGoogleKey: !!process.env.GOOGLE_API_KEY
+    });
+    
+    // Provide more specific error messages based on error type
+    let errorMessage = 'Too many requests at the moment. Please try again later.';
+    let errorCode = 500;
+    
+    if (error.message.includes('API key') || error.message.includes('401') || error.message.includes('authentication')) {
+      errorMessage = 'API authentication error - please check your API keys';
+      errorCode = 401;
+    } else if (error.message.includes('quota') || error.message.includes('rate limit') || error.message.includes('429')) {
+      errorMessage = 'Too many requests at the moment. Please try again later.';
+      errorCode = 429;
+    } else if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ENOTFOUND')) {
+      errorMessage = 'Network error - please check your internet connection';
+      errorCode = 503;
+    } else if (error.message.includes('transcript') || error.message.includes('subtitles')) {
+      errorMessage = 'Could not extract transcript from video - please try a different video';
+      errorCode = 422;
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'Request timeout - please try again';
+      errorCode = 408;
+    }
+    
     return {
-      statusCode: 500,
+      statusCode: errorCode,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         success: false, 
-        error: 'Internal server error during recipe processing',
-        details: error.message 
+        error: errorMessage,
+        details: error.message,
+        timestamp: new Date().toISOString(),
+        helpUrl: 'Please ensure all required API keys are configured in your .env file'
       }),
     };
   }
@@ -282,19 +399,28 @@ IMPORTANT FORMATTING RULES:
 Extract only information that is explicitly mentioned in the transcript. For calories, estimate per serving based on the ingredients and cooking methods mentioned, using standard nutritional values. Be accurate and detailed.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: OPENAI_CONFIG.MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: OPENAI_CONFIG.TEMPERATURE,
-      max_tokens: OPENAI_CONFIG.MAX_TOKENS,
-      response_format: { type: 'json_object' }
+    console.log(`[OpenAI] Starting recipe extraction from transcript (${transcript.length} chars)`);
+    const response = await callOpenAIWithRetry(async () => {
+      return await openai.chat.completions.create({
+        model: OPENAI_CONFIG.MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: OPENAI_CONFIG.TEMPERATURE,
+        max_tokens: OPENAI_CONFIG.MAX_TOKENS,
+        response_format: { type: 'json_object' }
+      });
     });
 
     const content = response.choices[0].message.content.trim();
   const data = safeParseJson(content);
   return normalizeRecipe(data);
   } catch (error) {
-    console.error('OpenAI recipe extraction failed:', error);
+    logError('OPENAI_RECIPE_EXTRACTION', error, { transcriptLength: transcript.length });
+    
+    // Provide more specific error message for rate limits
+    if (error.status === 429 || error.message.includes('rate limit')) {
+      throw new Error('Too many requests at the moment. Please try again later.');
+    }
+    
     throw new Error(`Recipe extraction failed: ${error.message}`);
   }
 }
@@ -354,19 +480,27 @@ IMPORTANT FORMATTING RULES:
 Make it realistic and detailed. Estimate calories per serving based on typical ingredients and portions for this type of dish. Only return valid JSON.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: OPENAI_CONFIG.MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: OPENAI_CONFIG.TEMPERATURE,
-      max_tokens: OPENAI_CONFIG.MAX_TOKENS,
-      response_format: { type: 'json_object' }
+    console.log(`[OpenAI] Generating recipe from title: "${videoTitle}"`);
+    const response = await callOpenAIWithRetry(async () => {
+      return await openai.chat.completions.create({
+        model: OPENAI_CONFIG.MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: OPENAI_CONFIG.TEMPERATURE,
+        max_tokens: OPENAI_CONFIG.MAX_TOKENS,
+        response_format: { type: 'json_object' }
+      });
     });
 
   const content = response.choices[0].message.content.trim();
   const data = safeParseJson(content);
   return normalizeRecipe(data);
   } catch (error) {
-    console.error('Recipe generation from title failed:', error);
+    logError('OPENAI_RECIPE_FROM_TITLE', error, { videoTitle });
+    
+    if (error.status === 429 || error.message.includes('rate limit')) {
+      throw new Error('Too many requests at the moment. Please try again later.');
+    }
+    
     throw new Error(`Recipe generation failed: ${error.message}`);
   }
 }
@@ -409,12 +543,15 @@ IMPORTANT FORMATTING RULES:
 
 Estimate calories per serving based on typical ingredients and portions for this dish.`;
 
-  const response = await openai.chat.completions.create({
-    model: OPENAI_CONFIG.MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: OPENAI_CONFIG.TEMPERATURE,
-    max_tokens: OPENAI_CONFIG.MAX_TOKENS,
-    response_format: { type: 'json_object' }
+  console.log(`[OpenAI] Generating recipe from query: "${query}"`);
+  const response = await callOpenAIWithRetry(async () => {
+    return await openai.chat.completions.create({
+      model: OPENAI_CONFIG.MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: OPENAI_CONFIG.TEMPERATURE,
+      max_tokens: OPENAI_CONFIG.MAX_TOKENS,
+      response_format: { type: 'json_object' }
+    });
   });
 
   const content = response.choices[0].message.content.trim();
