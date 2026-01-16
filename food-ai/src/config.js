@@ -26,7 +26,7 @@ const API_ENDPOINTS = {
 
 const OPENAI_CONFIG = {
   MODEL: 'gpt-4o',
-  TEMPERATURE: 0.3, // Low temperature for consistency while allowing variation between requests
+  TEMPERATURE: 0.0, // Zero hallucination as requested
   MAX_TOKENS: 2000,
 };
 

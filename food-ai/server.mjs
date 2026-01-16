@@ -322,8 +322,16 @@ app.post('/api/recipe', async (req, res) => {
     let selectedVideo = null;
     let transcript = null;
 
+    // Add randomization to video selection to prevent duplicate results
+    // When the same search returns the same videos, we want variety
+    const startIndex = Math.floor(Math.random() * Math.min(3, youtubeResults.length));
+    const videosToTry = [
+      ...youtubeResults.slice(startIndex, 5),
+      ...youtubeResults.slice(0, startIndex)
+    ].slice(0, 5);
+
     const tried = [];
-    for (const video of youtubeResults.slice(0, 5)) {
+    for (const video of videosToTry) {
       const vid = video?.id?.videoId;
       if (!vid) continue;
       tried.push(vid);
