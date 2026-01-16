@@ -1,9 +1,65 @@
 import { captionsHandler } from './captionsHandler.js';
+import { socialMediaHandler, isSocialMediaUrl } from './socialMediaHandler.js';
 import { OpenAI } from 'openai';
 import { OPENAI_CONFIG } from './config.js';
 
 // Add fetch polyfill
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
+// Simple in-memory cache to reduce OpenAI API calls
+const recipeCache = new Map();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (reduced from 1 hour)
+
+function getCacheKey(videoUrl, recipeName) {
+  // Create a more specific cache key including the video ID if possible
+  if (videoUrl) {
+    // Extract video ID from various URL formats
+    const videoIdMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\s?]+)/);
+    if (videoIdMatch) {
+      return `yt:${videoIdMatch[1]}`;
+    }
+    // For other URLs, use the full URL
+    return `url:${videoUrl}`;
+  }
+  if (recipeName) {
+    return `name:${recipeName.toLowerCase().trim()}`;
+  }
+  return '';
+}
+
+function getCachedRecipe(key) {
+  if (!key) return null;
+  const cached = recipeCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log(`✅ Returning cached recipe for key: ${key}`);
+    return cached.data;
+  }
+  // Clean up expired cache entry
+  if (cached) {
+    console.log(`🗑️ Removing expired cache entry for key: ${key}`);
+    recipeCache.delete(key);
+  }
+  return null;
+}
+
+function setCachedRecipe(key, data) {
+  if (!key) return;
+  console.log(`💾 Caching recipe for key: ${key}`);
+  recipeCache.set(key, { data, timestamp: Date.now() });
+  // Limit cache size
+  if (recipeCache.size > 100) {
+    const firstKey = recipeCache.keys().next().value;
+    recipeCache.delete(firstKey);
+  }
+}
+
+// Clear all cached recipes (useful for debugging/deployment)
+export function clearRecipeCache() {
+  const size = recipeCache.size;
+  recipeCache.clear();
+  console.log(`🧹 Cleared ${size} cached recipes`);
+  return size;
+}
 
 // Enhanced error logging helper
 function logError(context, error, additionalInfo = {}) {
@@ -62,6 +118,10 @@ function validateApiKeys() {
     issues.push('OPENAI_API_KEY is required for recipe processing');
   }
   
+  if (!process.env.VIDNAVIGATOR_API_KEY) {
+    issues.push('VIDNAVIGATOR_API_KEY is required for social media video transcription (optional but recommended)');
+  }
+  
   if (!process.env.YOUTUBE_API_KEY) {
     issues.push('YOUTUBE_API_KEY is required for video search (optional but recommended)');
   }
@@ -75,6 +135,44 @@ function validateApiKeys() {
   }
   
   return issues;
+}
+
+// Extract clean food name from video title, removing adjectives and promotional text
+function extractCleanFoodName(title) {
+  if (!title || typeof title !== 'string') return 'Recipe';
+  
+  // Common words to remove (adjectives, promotional terms, etc.)
+  const wordsToRemove = [
+    'easy', 'quick', 'best', 'perfect', 'delicious', 'amazing', 'ultimate',
+    'simple', 'homemade', 'authentic', 'traditional', 'classic', 'crispy',
+    'creamy', 'spicy', 'tasty', 'yummy', 'mouthwatering', 'incredible',
+    'how to make', 'recipe', 'cooking', 'tutorial', 'video', 'vlog',
+    'asmr', 'mukbang', 'food', 'dish', 'meal', 'chef', 'kitchen'
+  ];
+  
+  // Remove emojis and special characters
+  let cleaned = title
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Remove emojis
+    .replace(/[^\w\s-]/g, '') // Remove special chars except spaces and hyphens
+    .toLowerCase()
+    .trim();
+  
+  // Remove promotional words
+  wordsToRemove.forEach(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    cleaned = cleaned.replace(regex, '');
+  });
+  
+  // Clean up extra spaces and capitalize
+  cleaned = cleaned
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(word => word.length > 0)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  
+  return cleaned || 'Recipe';
 }
 
 // Validate if input is food-related using OpenAI
@@ -139,7 +237,17 @@ Be strict - only return isFood: false with high confidence (>0.8) if you're abso
 export async function recipeHandler(requestData) {
   try {
     console.log('Recipe handler received data:', JSON.stringify(requestData, null, 2));
-    console.log('⚠️  [RATE LIMIT WARNING] This app makes 2-3 OpenAI API calls per recipe request');
+    
+    // Check cache first
+    const cacheKey = getCacheKey(requestData.videoInput, requestData.recipeName);
+    const cached = getCachedRecipe(cacheKey);
+    if (cached) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: cached, fromCache: true }),
+      };
+    }
     
     // Validate API keys and log issues
     const apiKeyIssues = validateApiKeys();
@@ -212,12 +320,21 @@ export async function recipeHandler(requestData) {
       };
     }
 
-    console.log(`Processing YouTube URL: ${youtubeUrl}`);
+    console.log(`Processing video URL: ${youtubeUrl}`);
 
-    // Extract video details from YouTube
-    const captionResponse = await captionsHandler({
-      videoInput: youtubeUrl
-    });
+    // Route to appropriate handler based on URL type
+    let captionResponse;
+    if (isSocialMediaUrl(youtubeUrl)) {
+      console.log('Detected social media URL, using VidNavigator API');
+      captionResponse = await socialMediaHandler({
+        videoInput: youtubeUrl
+      });
+    } else {
+      console.log('Detected YouTube URL, using YouTube transcript API');
+      captionResponse = await captionsHandler({
+        videoInput: youtubeUrl
+      });
+    }
 
     const captionData = JSON.parse(captionResponse.body);
     if (!captionData.success) {
@@ -225,12 +342,36 @@ export async function recipeHandler(requestData) {
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: false, error: `Video processing failed: ${captionData.error}` }),
+        body: JSON.stringify({ 
+          success: false, 
+          error: `Video processing failed: ${captionData.error}`,
+          platform: captionData.platform 
+        }),
       };
     }
 
-    const { subtitles, videoId, title, description } = captionData.data;
+    const { subtitles, videoId, title, description, platform, originalUrl } = captionData.data;
     const queryUsed = recipeName || '';
+
+    // For social media videos, prioritize description (caption) as it often contains ingredients/steps
+    let contentToAnalyze = '';
+    let contentSource = '';
+    
+    // Check if description has useful recipe information (ingredients, steps, etc.)
+    const hasUsefulDescription = description && description.length > 50 && (
+      description.toLowerCase().includes('ingredient') ||
+      description.toLowerCase().includes('recipe') ||
+      description.toLowerCase().includes('cup') ||
+      description.toLowerCase().includes('tbsp') ||
+      description.toLowerCase().includes('step') ||
+      /\d+\s*(cup|tbsp|tsp|oz|gram|ml|minute|min)/i.test(description)
+    );
+
+    if (hasUsefulDescription) {
+      console.log('Using video description/caption as primary source (contains recipe info)');
+      contentToAnalyze = description;
+      contentSource = 'description';
+    }
 
     // Convert subtitles array to transcript text
     let transcript = '';
@@ -255,23 +396,46 @@ export async function recipeHandler(requestData) {
       console.log(`Filtered transcript: ${subtitles.length} subtitle entries → ${transcript.length} characters of text`);
     }
 
+    // If description wasn't useful, use transcript
+    if (!contentToAnalyze && transcript && transcript.length > 100) {
+      contentToAnalyze = transcript;
+      contentSource = 'transcript';
+    }
+
+    // If we have both, combine them (description first as it's more structured)
+    if (hasUsefulDescription && transcript && transcript.length > 100) {
+      console.log('Combining description and transcript for better recipe extraction');
+      contentToAnalyze = `Caption/Description:\n${description}\n\nVideo Transcript:\n${transcript}`;
+      contentSource = 'combined';
+    }
+
+    console.log(`Content source for recipe extraction: ${contentSource} (${contentToAnalyze.length} characters)`);
+
     // If we have sufficient transcript, extract recipe from it
-    if (transcript && transcript.length > 100) {
-      console.log(`Processing transcript of ${transcript.length} characters from ${subtitles.length} subtitle entries`);
-      const recipeFromTranscript = await extractRecipeFromTranscript(transcript, title || queryUsed || 'Recipe');
+    if (contentToAnalyze && contentToAnalyze.length > 50) {
+      console.log(`Processing ${contentSource} content of ${contentToAnalyze.length} characters`);
+      const cleanedTitle = extractCleanFoodName(title || queryUsed || 'Recipe');
+      const recipeFromTranscript = await extractRecipeFromTranscript(contentToAnalyze, cleanedTitle, contentSource);
       const imageUrl = await getFoodImage(recipeFromTranscript.title || title, queryUsed);
+      
+      const resultData = {
+        videoId,
+        videoTitle: title,
+        videoDescription: description,
+        platform: platform || 'YouTube',
+        originalUrl: originalUrl || youtubeUrl,
+        recipe: { ...recipeFromTranscript, image: imageUrl }
+      };
+      
+      // Cache the result
+      setCachedRecipe(cacheKey, resultData);
       
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           success: true,
-          data: {
-            videoId,
-            videoTitle: title,
-            videoDescription: description,
-            recipe: { ...recipeFromTranscript, image: imageUrl }
-          }
+          data: resultData
         }),
       };
     } else if (title) {
@@ -287,6 +451,8 @@ export async function recipeHandler(requestData) {
             videoId,
             videoTitle: title,
             videoDescription: description,
+            platform: platform || 'YouTube',
+            originalUrl: originalUrl || youtubeUrl,
             recipe: { ...recipeFromTitle, image: imageUrl }
           }
         }),
@@ -342,13 +508,21 @@ export async function recipeHandler(requestData) {
   }
 }
 
-async function extractRecipeFromTranscript(transcript, videoTitle) {
+async function extractRecipeFromTranscript(content, videoTitle, contentSource = 'transcript') {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   
-  const prompt = `Extract a complete recipe from this video transcript. The video is titled "${videoTitle}".
+  const sourceContext = contentSource === 'description' 
+    ? 'This is from the video caption/description which often contains the full recipe with ingredients and steps.'
+    : contentSource === 'combined'
+    ? 'This combines the video caption and transcript. The caption often has the structured recipe.'
+    : 'This is from the video transcript (spoken words).';
+  
+  const prompt = `Extract a complete recipe from this video content. The video is titled "${videoTitle}".
 
-Transcript:
-${transcript}
+${sourceContext}
+
+Content:
+${content}
 
 IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 4, "calories": 350
 
@@ -396,10 +570,15 @@ IMPORTANT FORMATTING RULES:
 - ALWAYS include an "ingredients" array for each step listing the specific ingredients used in that step
 - Keep ingredient names simple (e.g., "onions", "garlic", "oil", "flour") matching the main ingredient list
 
-Extract only information that is explicitly mentioned in the transcript. For calories, estimate per serving based on the ingredients and cooking methods mentioned, using standard nutritional values. Be accurate and detailed.`;
+Extract only information that is explicitly mentioned in the content. For calories, estimate per serving based on the ingredients and cooking methods mentioned, using standard nutritional values. Be accurate and detailed.
+
+IMPORTANT for title: Extract just the core food name from "${videoTitle}", removing adjectives like "easy", "quick", "best", "perfect", "delicious", "amazing", etc. For example:
+- "The BEST Crispy Fried Chicken!" → "Fried Chicken"
+- "Easy Homemade Chocolate Cake" → "Chocolate Cake"  
+- "Perfect Creamy Pasta Carbonara" → "Pasta Carbonara"`;
 
   try {
-    console.log(`[OpenAI] Starting recipe extraction from transcript (${transcript.length} chars)`);
+    console.log(`[OpenAI] Starting recipe extraction from ${contentSource} (${content.length} chars)`);
     const response = await callOpenAIWithRetry(async () => {
       return await openai.chat.completions.create({
         model: OPENAI_CONFIG.MODEL,
@@ -410,11 +589,21 @@ Extract only information that is explicitly mentioned in the transcript. For cal
       });
     });
 
-    const content = response.choices[0].message.content.trim();
-  const data = safeParseJson(content);
-  return normalizeRecipe(data);
+    const responseContent = response.choices[0].message.content.trim();
+    const data = safeParseJson(responseContent);
+    const normalized = normalizeRecipe(data);
+    
+    // Log what fields we got from OpenAI
+    console.log('[OpenAI] Recipe fields returned:', Object.keys(normalized));
+    console.log('[OpenAI] Description:', normalized.description ? 'YES' : 'NO');
+    console.log('[OpenAI] CookTime:', normalized.cookTime ? 'YES' : 'NO');
+    console.log('[OpenAI] Servings:', normalized.servings ? 'YES' : 'NO');
+    console.log('[OpenAI] Difficulty:', normalized.difficulty ? 'YES' : 'NO');
+    console.log('[OpenAI] Calories:', normalized.calories ? 'YES' : 'NO');
+    
+    return normalized;
   } catch (error) {
-    logError('OPENAI_RECIPE_EXTRACTION', error, { transcriptLength: transcript.length });
+    logError('OPENAI_RECIPE_EXTRACTION', error, { contentLength: content.length, contentSource });
     
     // Provide more specific error message for rate limits
     if (error.status === 429 || error.message.includes('rate limit')) {

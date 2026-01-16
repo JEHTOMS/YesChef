@@ -7,7 +7,8 @@ import { dirname, join } from 'path';
 
 import { ROUTES, CORS_CONFIG, PORT } from './src/config.js';
 import { captionsHandler } from './src/captionsHandler.js';
-import { recipeHandler } from './src/recipeHandler.js';
+import { socialMediaHandler } from './src/socialMediaHandler.js';
+import { recipeHandler, clearRecipeCache } from './src/recipeHandler.js';
 import { storesHandler } from './src/storesHandler.js';
 
 // Get the directory name of the current module
@@ -37,6 +38,7 @@ console.log(`🔑 Environment variables loaded:`, {
     GOOGLE_API_KEY: !!process.env.GOOGLE_API_KEY,
     GOOGLE_SEARCH_ENGINE_ID: !!process.env.GOOGLE_SEARCH_ENGINE_ID,
     GOOGLE_PLACES_API_KEY: !!process.env.GOOGLE_PLACES_API_KEY,
+    VIDNAVIGATOR_API_KEY: !!process.env.VIDNAVIGATOR_API_KEY,
     YT_COOKIE: !!process.env.YT_COOKIE
 });
 
@@ -51,6 +53,7 @@ console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Configured' : '
 console.log('GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? '✅ Configured' : '❌ Missing');
 console.log('GOOGLE_SEARCH_ENGINE_ID:', process.env.GOOGLE_SEARCH_ENGINE_ID ? '✅ Configured' : '❌ Missing');
 console.log('GOOGLE_PLACES_API_KEY:', process.env.GOOGLE_PLACES_API_KEY ? '✅ Configured' : '❌ Missing');
+console.log('VIDNAVIGATOR_API_KEY:', process.env.VIDNAVIGATOR_API_KEY ? '✅ Configured' : '❌ Missing');
 console.log();
 
 // Helper function to send handler responses
@@ -91,6 +94,16 @@ app.get('/health', (req, res) => {
       openai: !!process.env.OPENAI_API_KEY,
       google: !!process.env.GOOGLE_API_KEY && !!process.env.GOOGLE_SEARCH_ENGINE_ID
     }
+  });
+});
+
+// Clear recipe cache (useful for debugging)
+app.post('/api/clear-cache', (req, res) => {
+  const cleared = clearRecipeCache();
+  res.json({ 
+    success: true, 
+    message: `Cleared ${cleared} cached recipes`,
+    timestamp: new Date().toISOString()
   });
 });
 
