@@ -612,11 +612,15 @@ async function searchYouTubeRecipes(query, apiKey, searchEngineId) {
     console.log('- YouTube Search results count:', data.items?.length || 0);
     
     const items = data.items || [];
-    const firstYoutube = items.find(i => /youtube\.com|youtu\.be/.test(i.link || ''));
+    // Filter YouTube videos
+    const youtubeVideos = items.filter(i => /youtube\.com|youtu\.be/.test(i.link || ''));
     
-    if (firstYoutube) {
-      console.log('✅ Found YouTube video:', firstYoutube.link);
-      return firstYoutube.link;
+    if (youtubeVideos.length > 0) {
+      // Add randomization to prevent duplicate results for repeated searches
+      const randomIndex = Math.floor(Math.random() * youtubeVideos.length);
+      const selectedVideo = youtubeVideos[randomIndex];
+      console.log(`✅ Found YouTube video (${randomIndex + 1}/${youtubeVideos.length}):`, selectedVideo.link);
+      return selectedVideo.link;
     } else {
       console.log('❌ No YouTube video found in results');
       return null;

@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import { OPENAI_CONFIG } from './src/config.js';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -244,9 +245,9 @@ async function parseTranscriptToSteps(transcript, recipeName) {
   const prompt = `You are a professional recipe analyzer. Parse this YouTube cooking video transcript for "${recipeName}" and extract ONLY the cooking steps.\n\nTranscript: ${transcriptText}\n\nReturn a JSON object with a steps array. Each step:\n- text: instruction\n- heat: low|medium|high|null\n- time: number minutes or null\n- timestamp: integer seconds\nMax 12 steps.`;
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: OPENAI_CONFIG.MODEL,
     messages: [{ role: 'user', content: prompt }],
-  temperature: 0.0,
+    temperature: OPENAI_CONFIG.TEMPERATURE,
     response_format: { type: 'json_object' }
   });
 
@@ -263,9 +264,9 @@ async function extractIngredients(transcript, recipeName) {
   const prompt = `Extract ingredients from this cooking video transcript for "${recipeName}".\n\nTranscript: ${transcriptText}\n\nReturn JSON with an \"ingredients\" array of objects {name, quantity}.`;
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: OPENAI_CONFIG.MODEL,
     messages: [{ role: 'user', content: prompt }],
-  temperature: 0.0,
+    temperature: OPENAI_CONFIG.TEMPERATURE,
     response_format: { type: 'json_object' }
   });
 
@@ -282,9 +283,9 @@ async function getToolsAndAllergens(recipeName, ingredients) {
   const prompt = `For the recipe \"${recipeName}\" with ingredients: ${ingredientsList}\nReturn JSON with \"tools\" (uncommon only) and \"allergens\" arrays.`;
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: OPENAI_CONFIG.MODEL,
     messages: [{ role: 'user', content: prompt }],
-  temperature: 0.0,
+    temperature: OPENAI_CONFIG.TEMPERATURE,
     response_format: { type: 'json_object' }
   });
 
@@ -321,8 +322,24 @@ app.post('/api/recipe', async (req, res) => {
     let selectedVideo = null;
     let transcript = null;
 
+    // Add randomization to video selection to prevent duplicate results
+    // When the same search returns the same videos, we want variety
+    if (youtubeResults.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No videos found for this recipe',
+        debug: { tried: [] }
+      });
+    }
+    
+    const startIndex = Math.floor(Math.random() * youtubeResults.length);
+    const videosToTry = [
+      ...youtubeResults.slice(startIndex),
+      ...youtubeResults.slice(0, startIndex)
+    ];
+
     const tried = [];
-    for (const video of youtubeResults.slice(0, 5)) {
+    for (const video of videosToTry) {
       const vid = video?.id?.videoId;
       if (!vid) continue;
       tried.push(vid);
