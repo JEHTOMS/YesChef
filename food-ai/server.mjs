@@ -246,7 +246,7 @@ async function parseTranscriptToSteps(transcript, recipeName) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt }],
-  temperature: 0.0,
+    temperature: 0.3,
     response_format: { type: 'json_object' }
   });
 
@@ -265,7 +265,7 @@ async function extractIngredients(transcript, recipeName) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt }],
-  temperature: 0.0,
+    temperature: 0.3,
     response_format: { type: 'json_object' }
   });
 
@@ -284,7 +284,7 @@ async function getToolsAndAllergens(recipeName, ingredients) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt }],
-  temperature: 0.0,
+    temperature: 0.3,
     response_format: { type: 'json_object' }
   });
 
