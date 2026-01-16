@@ -1,28 +1,12 @@
 {
   "version": 2,
   "name": "yeschef",
-  "builds": [
+  "buildCommand": "cd food-ai && npm install && npm run build",
+  "outputDirectory": "food-ai/build",
+  "rewrites": [
     {
-      "src": "food-ai/server-clean.mjs",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "food-ai/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "cd food-ai && npm run build",
-        "outputDirectory": "food-ai/build"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/food-ai/server-clean.mjs"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/food-ai/build/$1"
+      "source": "/api/(.*)",
+      "destination": "/api/index"
     }
   ],
   "env": {
@@ -30,7 +14,7 @@
     "NODE_ENV": "production"
   },
   "functions": {
-    "food-ai/server-clean.mjs": {
+    "api/index.js": {
       "maxDuration": 30
     }
   }
