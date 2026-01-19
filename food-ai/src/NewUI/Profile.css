@@ -1,0 +1,10 @@
+.profile-section{
+    display: flex;
+padding: 16px;
+flex-direction: column;
+align-items: flex-start;
+gap: 16px;
+align-self: stretch;
+border-radius: 32px;
+background: #FFF;
+}

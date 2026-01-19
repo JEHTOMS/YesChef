@@ -1,10 +1,15 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useRecipe } from '../context/RecipeContext';
+import { useSavedRecipes } from '../context/SavedRecipesContext';
+import { useModal } from '../context/ModalContext';
+import { useUser } from '../context/UserContext';
 import { LocationService } from '../services/locationService';
+import { supabase } from '../lib/supabase';
 import './Home.css';
 import '../index.css';
-import Navbar from "../components/Navbar";
+import NewNavbar from "../NewUI/NewNavbar";
+import Modal from "../NewUI/Modal";
 import '../pages/FoodInfo.css';
 import Footer from "../components/Footer";
 import Ingredients from "../components/Ingredients";
@@ -14,8 +19,15 @@ import Steps from "../components/Steps";
 
 function FoodInformation() {
     const navigate = useNavigate();
-    const { recipeData, subtitleData, getServingMultiplier, getDisplayName, getVideoDuration } = useRecipe();
+    const { recipeData, subtitleData, getServingMultiplier, getDisplayName, getVideoDuration, originalQuery } = useRecipe();
+    const { saveRecipe, unsaveRecipe, isRecipeSaved, getSavedRecipeId, session: savedRecipesSession } = useSavedRecipes();
+    const { openUnsaveConfirmModal } = useModal();
+    const { session, getProfileInitial, loading: userLoading } = useUser();
     const [activeTab, setActiveTab] = useState('ingredients');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalType, setModalType] = useState('signup');
+    const [authLoading, setAuthLoading] = useState(false);
+    const [authMessage, setAuthMessage] = useState(null);
     const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
     const [isModalClosing, setIsModalClosing] = useState(false);
     const [stores, setStores] = useState([]);
@@ -27,6 +39,155 @@ function FoodInformation() {
     const [allSelected, setAllSelected] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const toastTimerRef = useRef(null);
+
+    // Check if current recipe is saved
+    const recipeSaved = isRecipeSaved(recipeData);
+
+    // Handle save recipe
+    const handleSaveRecipe = async () => {
+        if (!session) {
+            openSignUpModal();
+            return;
+        }
+        try {
+            await saveRecipe(recipeData, originalQuery);
+        } catch (err) {
+            console.error('Error saving recipe:', err);
+        }
+    };
+
+    // Handle unsave recipe
+    const handleUnsaveRecipe = () => {
+        const recipe = recipeData?.recipe || recipeData;
+        const recipeId = getSavedRecipeId(recipeData);
+        if (recipeId) {
+            openUnsaveConfirmModal(
+                recipe?.title || 'this recipe',
+                recipeId,
+                async (data) => {
+                    try {
+                        await unsaveRecipe(data.recipeId);
+                    } catch (err) {
+                        console.error('Error unsaving recipe:', err);
+                    }
+                }
+            );
+        }
+    };
+
+    // No need to fetch display name anymore - using UserContext
+
+    // Modal handlers
+    const openSignUpModal = () => {
+        setModalType('signup');
+        setAuthMessage('');
+        setIsModalOpen(true);
+    };
+
+    const openSignInModal = () => {
+        setModalType('signin');
+        setAuthMessage(null);
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setAuthMessage(null);
+    };
+
+    // Auth handler
+    const handleAuth = async (email, isSignUp = false) => {
+        setAuthLoading(true);
+        setAuthMessage(null);
+        
+        const { error } = await supabase.auth.signInWithOtp({
+            email: email,
+            options: {
+                emailRedirectTo: `${window.location.origin}/`,
+                shouldCreateUser: isSignUp,
+            }
+        });
+        
+        if (error) {
+            if (error.message.includes('Signups not allowed')) {
+                setAuthMessage(
+                    <>No account found with this email. Please <span><button type="button" onClick={(e) => { e.preventDefault(); openSignUpModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>sign up</button></span> first.</>
+                );
+            } else {
+                setAuthMessage(`Error: ${error.message}`);
+            }
+        } else {
+            setAuthMessage('Check your email for the magic link!');
+        }
+        setAuthLoading(false);
+    };
+
+    // Modal content based on type
+    const getModalConfig = () => {
+        if (modalType === 'signup') {
+            return {
+                title: "Create account",
+                subtitle: "Sign up to save your favourite recipes",
+                content: (
+                    <div style={{width: "100%"}}>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const email = e.target.email.value;
+                            handleAuth(email, true);
+                        }} className="form">
+                            <div className="form-input">
+                                <label className="input-label text-lg" htmlFor="email">Email address <p className="input-subtitle text-sm">We'll send you a link to sign in</p></label>
+                                <input className="text-input text-lg" type="email" name="email" id="email" required disabled={authLoading} />
+                            </div>
+
+                            <div className="standalone-checkbox">
+                                <input type="checkbox" id="email-updates" name="email-updates" />
+                                <label className="input-label text-lg" htmlFor="email-updates">Send me email about updates</label>
+                            </div>
+                            {authMessage && (
+                                <div className="validation-box">
+                                   <p className="text-sm pri-color" style={{textAlign:"center"}}>{authMessage}</p> 
+                                </div>
+                            )}
+                            <div className="form-footer" style={{alignItems: "center"}}>
+                                <p className="footer-text">By continuing, you agree to our <span><a href="/terms-of-service" style={{textDecoration:"underline"}}>Terms of Service</a></span> and <span><a href="/privacy-policy" style={{textDecoration:"underline"}}>Privacy Policy</a></span>.</p>
+                                <input className="pri-button text-lg" id="sign-up-button" type="submit" value={authLoading ? "Sending..." : "Sign up"} disabled={authLoading} />
+                                <p className="text-lg">Already have an account? <span><button type="button" onClick={(e) => { e.preventDefault(); openSignInModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>Sign In</button></span></p>
+                            </div>
+                         </form>
+                    </div>
+                )
+            };
+        } else {
+            return {
+                title: "Welcome back!",
+                subtitle: "Sign in to access your saved recipes",
+                content: (
+                    <div style={{width: "100%"}}>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const email = e.target['signin-email'].value;
+                            handleAuth(email, false);
+                        }} className="form">
+                            <div className="form-input">
+                                <label className="input-label text-lg" htmlFor="signin-email">Email address <p className="input-subtitle text-sm">We'll send you a link to sign in</p></label>
+                                <input className="text-input text-lg" type="email" name="signin-email" id="signin-email" required disabled={authLoading} />
+                            </div>
+                            {authMessage && (
+                                <div className="validation-box">
+                                   <p className="text-sm pri-color" style={{textAlign:"center"}}>{authMessage}</p> 
+                                </div>
+                            )}
+                            <div className="form-footer" style={{alignItems: "center"}}>
+                                <input className="pri-button text-lg" id="sign-in-button" type="submit" value={authLoading ? "Sending..." : "Sign in"} disabled={authLoading} />
+                                <p className="text-lg">Don't have an account? <span><button type="button" onClick={(e) => { e.preventDefault(); openSignUpModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>Sign up</button></span></p>
+                            </div>
+                         </form>
+                    </div>
+                )
+            };
+        }
+    };
 
     // Redirect to home if no recipe data is available
     useEffect(() => {
@@ -211,10 +372,12 @@ function FoodInformation() {
     };
 
     // Use API data only - no fallback demo data
+    // Handle both nested (recipeData.recipe) and flat (recipeData) structures
+    const recipe = recipeData?.recipe || recipeData;
     const ingredients = useMemo(() => (
-        recipeData ? transformIngredients(recipeData.recipe?.ingredients || []) : []
-    ), [recipeData]);
-    const directions = recipeData ? transformDirections(recipeData.recipe?.steps || []) : [];
+        recipeData ? transformIngredients(recipe?.ingredients || []) : []
+    ), [recipeData, recipe]);
+    const directions = recipeData ? transformDirections(recipe?.steps || []) : [];
 
     // Don't render anything if no recipe data (will redirect)
     if (!recipeData) {
@@ -224,9 +387,22 @@ function FoodInformation() {
     return (
         <div className="page food-info-page">
             <div className="header">
-                <Navbar 
-                    showBackButton={true} 
-                    foodName={getDisplayName()} 
+                <NewNavbar 
+                    showBackButton={true}
+                    showFoodName={true}
+                    foodName={getDisplayName()}
+                    showCreditsButton={!userLoading && !!session}
+                    credits={0}
+                    showProfileButton={!userLoading && !!session}
+                    profileInitial={getProfileInitial()}
+                    showAuthButtons={!userLoading && !session}
+                    isRecipeSaved={recipeSaved}
+                    onSaveRecipe={handleSaveRecipe}
+                    onUnsaveRecipe={handleUnsaveRecipe}
+                    onBackClick={() => navigate('/food-overview')}
+                    onProfileClick={() => navigate('/menu')}
+                    onSignIn={openSignInModal}
+                    onSignUp={openSignUpModal}
                 />
                 <div className="tab-bar">
                     <div className="segmented-controls" data-active={activeTab}>
@@ -371,6 +547,13 @@ function FoodInformation() {
                     Ingredients copied
                 </div>
             )}
+            <Modal 
+                title={getModalConfig().title}
+                subtitle={getModalConfig().subtitle}
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                content={getModalConfig().content}
+            />
         </div>
     );
 }

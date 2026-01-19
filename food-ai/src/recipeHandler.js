@@ -350,7 +350,7 @@ export async function recipeHandler(requestData) {
       };
     }
 
-    const { subtitles, videoId, title, description, platform, originalUrl } = captionData.data;
+    const { subtitles, videoId, title, description, platform, originalUrl, thumbnail } = captionData.data;
     const queryUsed = recipeName || '';
 
     // For social media videos, prioritize description (caption) as it often contains ingredients/steps
@@ -424,6 +424,7 @@ export async function recipeHandler(requestData) {
         videoDescription: description,
         platform: platform || 'YouTube',
         originalUrl: originalUrl || youtubeUrl,
+        thumbnail: thumbnail || null,
         recipe: { ...recipeFromTranscript, image: imageUrl }
       };
       
@@ -453,6 +454,7 @@ export async function recipeHandler(requestData) {
             videoDescription: description,
             platform: platform || 'YouTube',
             originalUrl: originalUrl || youtubeUrl,
+            thumbnail: thumbnail || null,
             recipe: { ...recipeFromTitle, image: imageUrl }
           }
         }),
@@ -914,13 +916,13 @@ async function searchSpecificFoodImage(searchTerm, apiKey, searchEngineId) {
   try {
     // Clean and enhance the search term for better results
     const cleanQuery = searchTerm
-      .replace(/recipe|food|dish/gi, '') // Remove redundant words
+      .replace(/recipe|food|dish|video|tutorial/gi, '') // Remove redundant words
       .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
     
-    // Create a highly specific query for the exact dish
-    const specificQuery = encodeURIComponent(`"${cleanQuery}" food prepared dish recipe high quality photo`);
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${specificQuery}&searchType=image&num=8&safe=active&imgType=photo&imgSize=large&imgColorType=color&fileType=jpg,png`;
+    // Create a highly specific query for the exact dish with better filters
+    const specificQuery = encodeURIComponent(`${cleanQuery} prepared dish plated food photography`);
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${specificQuery}&searchType=image&num=10&safe=active&imgType=photo&imgSize=large&imgColorType=color&fileType=jpg,png`;
     
     console.log(`🔍 Searching for specific image: "${cleanQuery}"`);
     const response = await fetch(url);
@@ -928,37 +930,69 @@ async function searchSpecificFoodImage(searchTerm, apiKey, searchEngineId) {
     
     const data = await response.json();
     
-    // Prioritize images that are likely recipe photos
-    const bestImage = data.items?.find(item => {
+    // Filter out images that are likely not actual food photos
+    const relevantImages = data.items?.filter(item => {
       const link = item.link?.toLowerCase() || '';
       const title = item.title?.toLowerCase() || '';
       const snippet = item.snippet?.toLowerCase() || '';
+      const contextLink = item.image?.contextLink?.toLowerCase() || '';
       
-      // Prefer images from recipe/food content
-      const isRecipeImage = 
-        link.includes('recipe') ||
-        title.includes('recipe') ||
-        snippet.includes('recipe') ||
+      // Exclude common non-food image types
+      const isExcluded = 
+        link.includes('icon') ||
+        link.includes('logo') ||
+        link.includes('button') ||
+        link.includes('avatar') ||
+        link.includes('profile') ||
+        title.includes('icon') ||
+        title.includes('logo') ||
+        contextLink.includes('wikipedia') || // Often show ingredient photos instead of dishes
+        contextLink.includes('wiki');
+      
+      // Must have good dimensions
+      const hasGoodDimensions = 
+        item.image?.width >= 500 && 
+        item.image?.height >= 400;
+      
+      return !isExcluded && hasGoodDimensions;
+    }) || [];
+    
+    // Prioritize images that are from recipe sites or clearly show the dish
+    const bestImage = relevantImages.find(item => {
+      const link = item.link?.toLowerCase() || '';
+      const title = item.title?.toLowerCase() || '';
+      const snippet = item.snippet?.toLowerCase() || '';
+      const contextLink = item.image?.contextLink?.toLowerCase() || '';
+      
+      // Prefer images from known recipe sites
+      const isFromRecipeSite = 
+        contextLink.includes('recipe') ||
+        contextLink.includes('allrecipes') ||
+        contextLink.includes('foodnetwork') ||
+        contextLink.includes('bonappetit') ||
+        contextLink.includes('epicurious') ||
+        contextLink.includes('seriouseats') ||
+        contextLink.includes('food');
+      
+      // Prefer images that mention the dish name
+      const mentionsDish = 
         title.includes(cleanQuery.toLowerCase()) ||
         snippet.includes(cleanQuery.toLowerCase());
       
-      const hasGoodDimensions = 
-        item.image?.width >= 400 && 
-        item.image?.height >= 300;
-      
-      return isRecipeImage && hasGoodDimensions;
+      return (isFromRecipeSite || mentionsDish);
     });
     
     if (bestImage) {
-      console.log('✅ Found specific recipe image:', bestImage.title);
+      console.log('✅ Found high-quality recipe image from:', bestImage.image?.contextLink);
       return bestImage.link;
     }
     
-    // Fallback to first high-quality image
-    const fallbackImage = data.items?.find(item =>
-      item.image?.width >= 400 &&
-      item.image?.height >= 300
-    );
+    // Fallback to first relevant image with good dimensions
+    const fallbackImage = relevantImages[0];
+    
+    if (fallbackImage) {
+      console.log('✅ Using fallback image from:', fallbackImage.image?.contextLink);
+    }
     
     return fallbackImage?.link || null;
   } catch (error) {

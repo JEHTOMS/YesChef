@@ -3,11 +3,24 @@ import '../index.css';
 import '../pages/Home.css';
 import '../pages/FoodO.css'; 
 
-function FoodHero({ image, name, videolink }) {
+function FoodHero({ image, name, videolink, platform = 'YouTube' }) {
+    // Debug log
+    console.log('🎬 FoodHero received videolink:', videolink);
+    console.log('🎬 FoodHero videolink truthy?', !!videolink);
+    
     const handleVideoClick = (e) => {
         if (videolink) {
             window.open(videolink, '_blank');
         }
+    };
+    
+    // Get platform display name
+    const getPlatformDisplay = () => {
+        if (!platform) return 'Video Source';
+        
+        // Capitalize first letter if needed
+        const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+        return platformName;
     };
 
     return (
@@ -36,7 +49,7 @@ function FoodHero({ image, name, videolink }) {
                                 <path d="M15 7H17C18.3261 7 19.5979 7.52678 20.5355 8.46447C21.4732 9.40215 22 10.6739 22 12C22 13.3261 21.4732 14.5979 20.5355 15.5355C19.5979 16.4732 18.3261 17 17 17H15" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M8 12H16" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
-                            <span className="video-link-tooltip">YouTube.com</span>
+                            <span className="video-link-tooltip">{getPlatformDisplay()}</span>
                         </div>
                     </a>
                 )}

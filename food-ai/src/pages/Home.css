@@ -199,6 +199,7 @@ width: 100%;
 
 .description{
    color: rgba(0, 0, 0, 0.55); 
+   padding: 4px 8px;
 }
 
 .input-wrapper{
@@ -221,6 +222,11 @@ align-self: stretch;
 border-radius: 24px;
 background: #FFF;
 }
+.input-footer{display: flex;
+justify-content: space-between;
+align-items: flex-end;
+align-self: stretch;
+}
 
 .input-field {
   border: 0px solid rgba(0, 0, 0, 0.2);
@@ -238,14 +244,86 @@ background: #FFF;
 .input-field::placeholder {
     color: rgba(0, 0, 0, 0.20);}
 
+.validation-box{
+  display: flex;
+padding: 15px 16px 16px 16px;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+gap: 16px;
+align-self: stretch;
+border-radius: 16px;
+border: 1px dashed #F04DCC;
+background: #FFD5F6;
+}
+/* Sheet grabber for mobile */
+.sheet-grabber {
+  width: 36px;
+  height: 5px;
+  min-height: 5px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 100px;
+  margin: 0 auto 4px auto;
+  display: none;
+}
 
 @media (max-width: 640px) {
   .main-content {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .back-button {
-    left: 0; /* change to 0 so the visual offset = 16px from .main-content padding */
+    left: 16px; /* restore left positioning when main-content has no padding */
+  }
+  
+  /* Remove bottom padding from input-wrapper on mobile */
+  .input-wrapper {
+    padding-bottom: 0;
+    padding-top: 196px;
+  }
+  
+  /* Change border-radius for sheet appearance */
+  .input-container {
+    border-radius: 24px 24px 0px 0px;
+    pointer-events: auto; /* Re-enable pointer events on the actual input (wrapper has pointer-events: none on mobile) */
+    touch-action: none; /* Prevent browser gestures to allow custom drag */
+  }
+  
+  /* Re-enable touch-action for interactive elements inside */
+  .input-container textarea,
+  .input-container button,
+  .input-container input {
+    touch-action: auto;
+  }
+  
+  /* Style description in input for mobile */
+  .input-footer .description {
+    max-width: 196px;
+    font-size: 14px;
+  }
+  
+  /* Show grabber on mobile */
+  .sheet-grabber {
+    display: block;
+    touch-action: none; /* Prevent browser gestures like pull-to-refresh */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+ 
+  /* Custom styles for react-modal-sheet */
+  .react-modal-sheet-container {
+    background: transparent !important;
+  }
+  
+  .react-modal-sheet-backdrop {
+    background: transparent !important;
+  }
+  
+  .react-modal-sheet-content {
+    box-shadow: none !important;
   }
 }

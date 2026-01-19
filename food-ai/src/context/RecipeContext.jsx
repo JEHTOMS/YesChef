@@ -145,8 +145,9 @@ export const RecipeProvider = ({ children }) => {
         setOriginalQuery(query);
 
         try {
-            // First validate if input is food-related (skip for YouTube URLs)
-            if (!isLikelyYoutube(query)) {
+            // First validate if input is food-related (skip for video URLs)
+            const videoSource = detectVideoSource(query);
+            if (!videoSource.isVideo) {
                 const validation = await validateFoodInput(query, controller.signal);
                 
                 // High confidence threshold to avoid false positives
@@ -159,7 +160,7 @@ export const RecipeProvider = ({ children }) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...(isLikelyYoutube(query) ? { videoInput: query } : { recipeName: query }),
+                    ...(videoSource.isVideo ? { videoInput: query } : { recipeName: query }),
                     lang: 'en'
                 }),
                 signal: controller.signal,
@@ -236,12 +237,40 @@ export const RecipeProvider = ({ children }) => {
         // Do not set an error; user intentionally cancelled
     };
 
-    const isLikelyYoutube = (val) => {
-        if (!val) return false;
-        const trimmed = String(val).trim();
-        const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/ |\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const detectVideoSource = (val) => {
+        if (!val) return { isVideo: false, platform: null };
+        const trimmed = String(val).trim().toLowerCase();
+        
+        // Check for social media platforms
+        if (trimmed.includes('instagram.com') || trimmed.includes('instagr.am')) {
+            return { isVideo: true, platform: 'Instagram' };
+        }
+        if (trimmed.includes('tiktok.com')) {
+            return { isVideo: true, platform: 'TikTok' };
+        }
+        if (trimmed.includes('facebook.com') || trimmed.includes('fb.watch') || trimmed.includes('fb.com')) {
+            return { isVideo: true, platform: 'Facebook' };
+        }
+        if (trimmed.includes('twitter.com') || trimmed.includes('x.com')) {
+            return { isVideo: true, platform: 'Twitter' };
+        }
+        if (trimmed.includes('vimeo.com')) {
+            return { isVideo: true, platform: 'Vimeo' };
+        }
+        
+        // Check for YouTube
+        const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
         const id11 = /^[a-zA-Z0-9_-]{11}$/;
-        return ytRegex.test(trimmed) || id11.test(trimmed);
+        if (ytRegex.test(trimmed) || id11.test(trimmed)) {
+            return { isVideo: true, platform: 'YouTube' };
+        }
+        
+        return { isVideo: false, platform: null };
+    };
+
+    const isLikelyYoutube = (val) => {
+        const result = detectVideoSource(val);
+        return result.isVideo; // Returns true for any video platform
     };
 
     const clearRecipe = () => {
@@ -256,6 +285,25 @@ export const RecipeProvider = ({ children }) => {
         removeFromStorage(STORAGE_KEYS.SUBTITLE_DATA);
         removeFromStorage(STORAGE_KEYS.ORIGINAL_QUERY);
         removeFromStorage(STORAGE_KEYS.CURRENT_SERVINGS);
+    };
+
+    // Load a recipe from saved recipes (for navigation from SavedRecipes list)
+    const setRecipeFromSaved = (savedRecipeData, originalUrl = '') => {
+        setRecipeData(savedRecipeData);
+        setOriginalQuery(originalUrl || '');
+        setError(null);
+        setLoading(false);
+        
+        // Update servings based on the saved recipe
+        if (savedRecipeData?.recipe?.servings) {
+            setCurrentServings(savedRecipeData.recipe.servings);
+        } else {
+            setCurrentServings(1);
+        }
+        
+        // Persist to localStorage
+        saveToStorage(STORAGE_KEYS.RECIPE_DATA, savedRecipeData);
+        saveToStorage(STORAGE_KEYS.ORIGINAL_QUERY, originalUrl);
     };
 
     // Calculate dynamic video duration from subtitle data
@@ -392,6 +440,7 @@ export const RecipeProvider = ({ children }) => {
         clearError,
         getDisplayName, // Export the smart name function
         getVideoDuration, // Export video duration calculation
+        setRecipeFromSaved, // Load saved recipe into context
         // Serving size management
         currentServings,
         setCurrentServings,
