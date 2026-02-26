@@ -1,1 +1,1 @@
-web: cd food-ai && npm install --production && node server-clean.mjs
+web: cd food-ai && node server-clean.mjs
