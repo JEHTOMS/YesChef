@@ -5,8 +5,19 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import OpenAI from 'openai';
-import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
+// Stripe and Supabase admin are dynamically imported to prevent server crashes
+// if packages are missing (same pattern as @google-cloud/speech below)
+let Stripe, createClient;
+try {
+  Stripe = (await import('stripe')).default;
+} catch (e) {
+  console.warn('⚠️ stripe package not available:', e.message);
+}
+try {
+  createClient = (await import('@supabase/supabase-js')).createClient;
+} catch (e) {
+  console.warn('⚠️ @supabase/supabase-js package not available:', e.message);
+}
 // @google-cloud/speech and multer are lazy-loaded in the STT endpoint to avoid
 // crashing on startup when credentials aren't configured
 
@@ -32,11 +43,11 @@ try {
 const app = express();
 
 // Stripe + Supabase Admin (for payment processing & webhook writes)
-const stripe = process.env.STRIPE_SECRET_KEY
+const stripe = Stripe && process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 
-const supabaseAdmin = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseAdmin = createClient && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
 
