@@ -1,0 +1,15 @@
+# Nixpacks config for Railway - dual runtime (Node.js + Python)
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x", "python311", "python311Packages.pip"]
+
+[phases.install]
+cmds = [
+  "cd food-ai && npm install --omit=dev",
+  "pip install youtube-transcript-api"
+]
+
+[phases.build]
+cmds = ["echo 'Backend only - no frontend build needed'"]
+
+[start]
+cmd = "cd food-ai && node server-clean.mjs"
