@@ -5,12 +5,12 @@
   "main": "food-ai/server-clean.mjs",
   "type": "module",
   "scripts": {
-    "start": "cd food-ai && npm install --production && node server-clean.mjs",
-    "build": "cd food-ai && npm install --production",
+    "start": "cd food-ai && node server-clean.mjs",
+    "build": "cd food-ai && npm install --omit=dev",
     "dev": "cd food-ai && node server-clean.mjs"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "dotenv": "^17.2.2"

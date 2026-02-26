@@ -4,8 +4,8 @@ nixPkgs = ["nodejs_20", "npm-9_x", "python311", "python311Packages.pip"]
 
 [phases.install]
 cmds = [
-  "cd food-ai && npm install --omit=dev",
-  "pip install youtube-transcript-api"
+  "cd food-ai && rm -rf node_modules && npm ci --omit=dev",
+  "python3 -m pip install --no-cache-dir youtube-transcript-api"
 ]
 
 [phases.build]
