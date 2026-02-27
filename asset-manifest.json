@@ -1,17 +1,16 @@
 {
   "files": {
-    "main.css": "./static/css/main.4f6973fd.css",
-    "main.js": "./static/js/main.72b8293c.js",
+    "main.css": "./static/css/main.1609f527.css",
+    "main.js": "./static/js/main.41bfebfa.js",
     "static/js/453.52cf7b0c.chunk.js": "./static/js/453.52cf7b0c.chunk.js",
     "static/media/alarm-clock-short-6402.mp3": "./static/media/alarm-clock-short-6402.e79e0abb7c74667ec9d7.mp3",
-    "static/media/Pop_sound.mp3": "./static/media/Pop_sound.cddf9857eaffbfb555e0.mp3",
     "index.html": "./index.html",
-    "main.4f6973fd.css.map": "./static/css/main.4f6973fd.css.map",
-    "main.72b8293c.js.map": "./static/js/main.72b8293c.js.map",
+    "main.1609f527.css.map": "./static/css/main.1609f527.css.map",
+    "main.41bfebfa.js.map": "./static/js/main.41bfebfa.js.map",
     "453.52cf7b0c.chunk.js.map": "./static/js/453.52cf7b0c.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.4f6973fd.css",
-    "static/js/main.72b8293c.js"
+    "static/css/main.1609f527.css",
+    "static/js/main.41bfebfa.js"
   ]
 }
