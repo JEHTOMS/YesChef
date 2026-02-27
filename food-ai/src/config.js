@@ -43,6 +43,7 @@ const ROUTES = {
   SPEECH_CONVERSE: '/api/speech/converse',
   SPEECH_PROCESS: '/api/speech/process',
   STRIPE_CHECKOUT: '/api/stripe/create-checkout-session',
+  STRIPE_PORTAL: '/api/stripe/create-portal-session',
   RECIPE_SAVE: '/api/recipes/save',
 };
 
@@ -57,6 +58,7 @@ const API_ENDPOINTS = {
   SPEECH_CONVERSE: `${API_BASE_URL}/api/speech/converse`,
   SPEECH_PROCESS: `${API_BASE_URL}/api/speech/process`,
   STRIPE_CHECKOUT: `${API_BASE_URL}/api/stripe/create-checkout-session`,
+  STRIPE_PORTAL: `${API_BASE_URL}/api/stripe/create-portal-session`,
   RECIPE_SAVE: `${API_BASE_URL}/api/recipes/save`,
 };
 

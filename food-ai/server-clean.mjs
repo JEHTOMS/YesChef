@@ -763,6 +763,43 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
   }
 });
 
+// Create a Stripe Customer Portal session (for managing subscriptions)
+app.post('/api/stripe/create-portal-session', async (req, res) => {
+  if (!stripe || !supabaseAdmin) {
+    return res.status(503).json({ error: 'Payment service not configured' });
+  }
+
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .single();
+
+    if (!profile?.stripe_customer_id) {
+      return res.status(404).json({ error: 'No billing account found' });
+    }
+
+    const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || '';
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: profile.stripe_customer_id,
+      return_url: `${origin}/plans`,
+    });
+
+    res.json({ url: portalSession.url });
+  } catch (error) {
+    console.error('Portal session error:', error);
+    res.status(500).json({ error: 'Failed to create portal session' });
+  }
+});
+
 // Stripe webhook — processes payment confirmations
 app.post('/api/stripe/webhook', async (req, res) => {
   if (!stripe || !supabaseAdmin) {
@@ -947,16 +984,20 @@ app.post('/api/recipes/save', async (req, res) => {
 
     const isPro = profile.subscription_status === 'active';
 
-    if (!isPro && profile.credits < 1) {
+    // Extract recipe and calculate credit cost (1 credit per step, minimum 1)
+    const recipe = recipeData?.recipe || recipeData;
+    const creditsRequired = Math.max(1, Array.isArray(recipe?.steps) ? recipe.steps.length : 1);
+
+    if (!isPro && profile.credits < creditsRequired) {
       return res.status(403).json({
         error: 'Insufficient credits',
         credits: profile.credits,
+        creditsRequired,
         needsUpgrade: true,
       });
     }
 
     // Build the recipe row
-    const recipe = recipeData?.recipe || recipeData;
     const videoId = recipeData?.videoId;
     const thumbnail = recipeData?.thumbnail
       || (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null)
@@ -988,10 +1029,10 @@ app.post('/api/recipes/save', async (req, res) => {
       throw insertError;
     }
 
-    // Deduct credit (only if not Pro)
+    // Deduct credits (only if not Pro) — cost equals number of recipe steps
     let newBalance = profile.credits;
     if (!isPro) {
-      newBalance = profile.credits - 1;
+      newBalance = profile.credits - creditsRequired;
       await supabaseAdmin
         .from('profiles')
         .update({ credits: newBalance })
@@ -1001,19 +1042,20 @@ app.post('/api/recipes/save', async (req, res) => {
         .from('credit_transactions')
         .insert({
           user_id: userId,
-          amount: -1,
+          amount: -creditsRequired,
           balance_after: newBalance,
           type: 'save_recipe',
           recipe_id: savedRecipe.id,
         });
     }
 
-    console.log(`📌 Recipe saved for user ${userId}. Credits: ${newBalance}${isPro ? ' (Pro)' : ''}`);
+    console.log(`📌 Recipe saved for user ${userId}. Credits: ${newBalance} (cost: ${creditsRequired})${isPro ? ' (Pro)' : ''}`);
 
     res.json({
       success: true,
       recipe: savedRecipe,
       credits: newBalance,
+      creditsRequired,
       isPro,
     });
 
