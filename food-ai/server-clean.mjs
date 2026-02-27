@@ -826,7 +826,17 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
       });
     }
 
-    const subscription = await stripe.subscriptions.retrieve(profile.subscription_id);
+    let subscription;
+    try {
+      subscription = await stripe.subscriptions.retrieve(profile.subscription_id);
+    } catch (stripeErr) {
+      console.error('Stripe subscription retrieve failed:', stripeErr.message);
+      return res.json({
+        hasSubscription: false,
+        cancelAtPeriodEnd: false,
+        pendingPlanChange: null,
+      });
+    }
 
     // Detect pending plan switch from Stripe's pending_update field
     let pendingPlanChange = null;
