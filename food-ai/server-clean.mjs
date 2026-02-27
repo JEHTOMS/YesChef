@@ -123,7 +123,6 @@ app.post(ROUTES.STORES, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    version: '2.0.0-stripe',
     timestamp: new Date().toISOString(),
     environment: {
       openai: !!process.env.OPENAI_API_KEY,
@@ -801,6 +800,65 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
   }
 });
 
+// Fetch live subscription status including pending changes
+app.post('/api/stripe/subscription-status', async (req, res) => {
+  if (!stripe || !supabaseAdmin) {
+    return res.status(503).json({ error: 'Payment service not configured' });
+  }
+
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('subscription_id')
+      .eq('id', userId)
+      .single();
+
+    if (!profile?.subscription_id) {
+      return res.json({
+        hasSubscription: false,
+        cancelAtPeriodEnd: false,
+        pendingPlanChange: null,
+      });
+    }
+
+    const subscription = await stripe.subscriptions.retrieve(profile.subscription_id);
+
+    // Detect pending plan switch from Stripe's pending_update field
+    let pendingPlanChange = null;
+    if (subscription.pending_update) {
+      const pendingPriceId = subscription.pending_update.subscription_items?.[0]?.price;
+      let pendingTier = 'monthly';
+      let pendingPrice = '$4.99 / month';
+      if (pendingPriceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID) {
+        pendingTier = 'annual';
+        pendingPrice = '$39.99 / year';
+      }
+
+      pendingPlanChange = {
+        newTier: pendingTier,
+        newPrice: pendingPrice,
+        effectiveDate: new Date(subscription.pending_update.expires_at * 1000).toISOString(),
+      };
+    }
+
+    res.json({
+      hasSubscription: true,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+      cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+      pendingPlanChange,
+    });
+  } catch (error) {
+    console.error('Subscription status error:', error);
+    res.status(500).json({ error: 'Failed to fetch subscription status' });
+  }
+});
+
 // Stripe webhook — processes payment confirmations
 app.post('/api/stripe/webhook', async (req, res) => {
   if (!stripe || !supabaseAdmin) {
@@ -917,10 +975,12 @@ app.post('/api/stripe/webhook', async (req, res) => {
               subscription_tier: tier,
               subscription_id: subscription.id,
               subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              cancel_at_period_end: subscription.cancel_at_period_end || false,
+              cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
             })
             .eq('id', profile.id);
 
-          console.log(`📋 Subscription ${event.type}: user ${profile.id}, status=${status}, tier=${tier}`);
+          console.log(`📋 Subscription ${event.type}: user ${profile.id}, status=${status}, tier=${tier}, cancel_at_period_end=${subscription.cancel_at_period_end}`);
         }
         break;
       }
@@ -943,6 +1003,8 @@ app.post('/api/stripe/webhook', async (req, res) => {
               subscription_tier: null,
               subscription_id: null,
               subscription_current_period_end: null,
+              cancel_at_period_end: false,
+              cancel_at: null,
             })
             .eq('id', profile.id);
           console.log(`❌ Subscription canceled for user ${profile.id}`);
