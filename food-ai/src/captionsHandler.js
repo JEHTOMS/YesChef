@@ -1,6 +1,7 @@
 // Hybrid caption extraction handler using multiple methods for maximum compatibility
-import pkg from '@danielxceron/youtube-transcript';
-const { YoutubeTranscript } = pkg;
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { YoutubeTranscript } = require('@danielxceron/youtube-transcript');
 import { getVideoDetails } from 'youtube-caption-extractor';
 
 const captionsHandler = async (body) => {
