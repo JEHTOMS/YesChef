@@ -123,7 +123,7 @@ app.post(ROUTES.STORES, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    version: 'v2.2-python',
+    version: 'v2.3-jsonly',
     timestamp: new Date().toISOString(),
     environment: {
       openai: !!process.env.OPENAI_API_KEY,
@@ -135,64 +135,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Diagnostic: test Python transcript extraction
-app.get('/api/debug/transcript/:videoId', async (req, res) => {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const { join } = await import('path');
-  const execFileAsync = promisify(execFile);
-
-  const videoId = req.params.videoId;
-  const results = { videoId, pythonAvailable: false, transcriptResult: null };
-  results.path = process.env.PATH;
-  results.cwd = process.cwd();
-
-  // Try different Python binary names
-  const pythonBins = ['python3', 'python3.11', 'python'];
-  let pythonBin = null;
-  for (const bin of pythonBins) {
-    try {
-      const { stdout } = await execFileAsync(bin, ['--version'], { timeout: 5000 });
-      results.pythonAvailable = true;
-      results.pythonVersion = stdout.trim();
-      results.pythonBin = bin;
-      pythonBin = bin;
-      break;
-    } catch (e) {
-      // Try next
-    }
-  }
-
-  // Also try to find python via which
-  try {
-    const { stdout } = await execFileAsync('find', ['/nix', '-name', 'python3*', '-type', 'f'], { timeout: 5000 });
-    results.nixPythonPaths = stdout.trim().split('\n').filter(Boolean).slice(0, 5);
-  } catch (e) {
-    // Not on Nixpacks or find failed
-  }
-
-  if (!pythonBin) {
-    results.pythonError = 'No python binary found';
-    return res.json(results);
-  }
-
-  // Test transcript_fetcher.py
-  try {
-    const scriptPath = join(process.cwd(), 'transcript_fetcher.py');
-    results.scriptPath = scriptPath;
-    const { stdout, stderr } = await execFileAsync(pythonBin, [scriptPath, videoId], {
-      timeout: 30000,
-      cwd: process.cwd(),
-    });
-    if (stderr) results.pythonStderr = stderr;
-    results.transcriptResult = JSON.parse(stdout);
-  } catch (e) {
-    results.transcriptError = e.message;
-    if (e.stderr) results.transcriptStderr = e.stderr;
-  }
-
-  res.json(results);
-});
 
 // Clear recipe cache (useful for debugging)
 app.post('/api/clear-cache', (req, res) => {
