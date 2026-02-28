@@ -803,6 +803,14 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
   }
 });
 
+// Map Stripe price ID to display tier and price string
+const mapPriceId = (priceId) => {
+  if (priceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID) {
+    return { tier: 'annual', price: '$39.99 / year' };
+  }
+  return { tier: 'monthly', price: '$4.99 / month' };
+};
+
 // Fetch live subscription status including pending changes
 app.post('/api/stripe/subscription-status', async (req, res) => {
   if (!stripe || !supabaseAdmin) {
@@ -848,25 +856,44 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
     }
 
     // Step 3: Process pending plan changes
+    // Check pending_update (API-driven) and subscription schedule (Portal-driven)
     let pendingPlanChange = null;
+    const currentPriceId = subscription.items.data[0]?.price?.id;
+
     if (subscription.pending_update) {
       try {
         const pendingPriceId = subscription.pending_update.subscription_items?.[0]?.price;
-        let pendingTier = 'monthly';
-        let pendingPrice = '$4.99 / month';
-        if (pendingPriceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID) {
-          pendingTier = 'annual';
-          pendingPrice = '$39.99 / year';
-        }
-
+        const { tier, price } = mapPriceId(pendingPriceId);
         const expiresAt = subscription.pending_update.expires_at;
         pendingPlanChange = {
-          newTier: pendingTier,
-          newPrice: pendingPrice,
+          newTier: tier,
+          newPrice: price,
           effectiveDate: expiresAt ? new Date(expiresAt * 1000).toISOString() : null,
         };
       } catch (pendingErr) {
         console.error('Error processing pending_update:', pendingErr.message);
+      }
+    }
+
+    // Check subscription schedule (Stripe Portal uses this for plan switches at period end)
+    if (!pendingPlanChange && subscription.schedule) {
+      try {
+        const schedule = await stripe.subscriptionSchedules.retrieve(subscription.schedule);
+        const phases = schedule.phases || [];
+        for (let i = 1; i < phases.length; i++) {
+          const phasePriceId = phases[i].items?.[0]?.price;
+          if (phasePriceId && phasePriceId !== currentPriceId) {
+            const { tier, price } = mapPriceId(phasePriceId);
+            pendingPlanChange = {
+              newTier: tier,
+              newPrice: price,
+              effectiveDate: new Date(phases[i].start_date * 1000).toISOString(),
+            };
+            break;
+          }
+        }
+      } catch (scheduleErr) {
+        console.error('Error fetching subscription schedule:', scheduleErr.message);
       }
     }
 
