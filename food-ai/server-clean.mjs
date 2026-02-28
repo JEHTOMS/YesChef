@@ -144,14 +144,35 @@ app.get('/api/debug/transcript/:videoId', async (req, res) => {
 
   const videoId = req.params.videoId;
   const results = { videoId, pythonAvailable: false, transcriptResult: null };
+  results.path = process.env.PATH;
+  results.cwd = process.cwd();
 
-  // Test if python3 exists
+  // Try different Python binary names
+  const pythonBins = ['python3', 'python3.11', 'python'];
+  let pythonBin = null;
+  for (const bin of pythonBins) {
+    try {
+      const { stdout } = await execFileAsync(bin, ['--version'], { timeout: 5000 });
+      results.pythonAvailable = true;
+      results.pythonVersion = stdout.trim();
+      results.pythonBin = bin;
+      pythonBin = bin;
+      break;
+    } catch (e) {
+      // Try next
+    }
+  }
+
+  // Also try to find python via which
   try {
-    const { stdout } = await execFileAsync('python3', ['--version'], { timeout: 5000 });
-    results.pythonAvailable = true;
-    results.pythonVersion = stdout.trim();
+    const { stdout } = await execFileAsync('find', ['/nix', '-name', 'python3*', '-type', 'f'], { timeout: 5000 });
+    results.nixPythonPaths = stdout.trim().split('\n').filter(Boolean).slice(0, 5);
   } catch (e) {
-    results.pythonError = e.message;
+    // Not on Nixpacks or find failed
+  }
+
+  if (!pythonBin) {
+    results.pythonError = 'No python binary found';
     return res.json(results);
   }
 
@@ -159,7 +180,7 @@ app.get('/api/debug/transcript/:videoId', async (req, res) => {
   try {
     const scriptPath = join(process.cwd(), 'transcript_fetcher.py');
     results.scriptPath = scriptPath;
-    const { stdout, stderr } = await execFileAsync('python3', [scriptPath, videoId], {
+    const { stdout, stderr } = await execFileAsync(pythonBin, [scriptPath, videoId], {
       timeout: 30000,
       cwd: process.cwd(),
     });
