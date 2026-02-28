@@ -123,7 +123,7 @@ app.post(ROUTES.STORES, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    version: 'v2.1',
+    version: 'v2.2-python',
     timestamp: new Date().toISOString(),
     environment: {
       openai: !!process.env.OPENAI_API_KEY,
