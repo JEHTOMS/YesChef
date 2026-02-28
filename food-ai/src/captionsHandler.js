@@ -1,5 +1,6 @@
 // Hybrid caption extraction handler using multiple methods for maximum compatibility
-import { YoutubeTranscript } from '@danielxceron/youtube-transcript';
+import pkg from '@danielxceron/youtube-transcript';
+const { YoutubeTranscript } = pkg;
 import { getVideoDetails } from 'youtube-caption-extractor';
 
 const captionsHandler = async (body) => {
