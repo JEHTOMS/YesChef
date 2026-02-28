@@ -135,6 +135,44 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Diagnostic: test Python transcript extraction
+app.get('/api/debug/transcript/:videoId', async (req, res) => {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const { join } = await import('path');
+  const execFileAsync = promisify(execFile);
+
+  const videoId = req.params.videoId;
+  const results = { videoId, pythonAvailable: false, transcriptResult: null };
+
+  // Test if python3 exists
+  try {
+    const { stdout } = await execFileAsync('python3', ['--version'], { timeout: 5000 });
+    results.pythonAvailable = true;
+    results.pythonVersion = stdout.trim();
+  } catch (e) {
+    results.pythonError = e.message;
+    return res.json(results);
+  }
+
+  // Test transcript_fetcher.py
+  try {
+    const scriptPath = join(process.cwd(), 'transcript_fetcher.py');
+    results.scriptPath = scriptPath;
+    const { stdout, stderr } = await execFileAsync('python3', [scriptPath, videoId], {
+      timeout: 30000,
+      cwd: process.cwd(),
+    });
+    if (stderr) results.pythonStderr = stderr;
+    results.transcriptResult = JSON.parse(stdout);
+  } catch (e) {
+    results.transcriptError = e.message;
+    if (e.stderr) results.transcriptStderr = e.stderr;
+  }
+
+  res.json(results);
+});
+
 // Clear recipe cache (useful for debugging)
 app.post('/api/clear-cache', (req, res) => {
   const cleared = clearRecipeCache();
