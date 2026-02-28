@@ -123,11 +123,14 @@ app.post(ROUTES.STORES, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
+    version: 'v2.1',
     timestamp: new Date().toISOString(),
     environment: {
       openai: !!process.env.OPENAI_API_KEY,
       google: !!process.env.GOOGLE_API_KEY && !!process.env.GOOGLE_SEARCH_ENGINE_ID,
-      ytCookie: !!process.env.YT_COOKIE
+      ytCookie: !!process.env.YT_COOKIE,
+      stripe: !!process.env.STRIPE_SECRET_KEY,
+      supabase: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     }
   });
 });
@@ -812,11 +815,16 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const { data: profile } = await supabaseAdmin
+    // Step 1: Fetch profile from Supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('subscription_id')
       .eq('id', userId)
       .single();
+
+    if (profileError) {
+      console.error('Supabase profile query error:', profileError.message, profileError.code);
+    }
 
     if (!profile?.subscription_id) {
       return res.json({
@@ -826,6 +834,7 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
       });
     }
 
+    // Step 2: Retrieve subscription from Stripe
     let subscription;
     try {
       subscription = await stripe.subscriptions.retrieve(profile.subscription_id);
@@ -838,34 +847,43 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
       });
     }
 
-    // Detect pending plan switch from Stripe's pending_update field
+    // Step 3: Process pending plan changes
     let pendingPlanChange = null;
     if (subscription.pending_update) {
-      const pendingPriceId = subscription.pending_update.subscription_items?.[0]?.price;
-      let pendingTier = 'monthly';
-      let pendingPrice = '$4.99 / month';
-      if (pendingPriceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID) {
-        pendingTier = 'annual';
-        pendingPrice = '$39.99 / year';
-      }
+      try {
+        const pendingPriceId = subscription.pending_update.subscription_items?.[0]?.price;
+        let pendingTier = 'monthly';
+        let pendingPrice = '$4.99 / month';
+        if (pendingPriceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID) {
+          pendingTier = 'annual';
+          pendingPrice = '$39.99 / year';
+        }
 
-      pendingPlanChange = {
-        newTier: pendingTier,
-        newPrice: pendingPrice,
-        effectiveDate: new Date(subscription.pending_update.expires_at * 1000).toISOString(),
-      };
+        const expiresAt = subscription.pending_update.expires_at;
+        pendingPlanChange = {
+          newTier: pendingTier,
+          newPrice: pendingPrice,
+          effectiveDate: expiresAt ? new Date(expiresAt * 1000).toISOString() : null,
+        };
+      } catch (pendingErr) {
+        console.error('Error processing pending_update:', pendingErr.message);
+      }
     }
+
+    // Step 4: Build safe response
+    const cancelAt = subscription.cancel_at;
+    const currentPeriodEnd = subscription.current_period_end;
 
     res.json({
       hasSubscription: true,
       cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
-      cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+      cancelAt: cancelAt ? new Date(cancelAt * 1000).toISOString() : null,
+      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString() : null,
       pendingPlanChange,
     });
   } catch (error) {
-    console.error('Subscription status error:', error);
-    res.status(500).json({ error: 'Failed to fetch subscription status' });
+    console.error('Subscription status error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch subscription status', detail: error.message });
   }
 });
 
