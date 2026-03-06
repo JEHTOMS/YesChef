@@ -134,6 +134,7 @@ border-radius: 200px;
 background: #F04DCC;
 border: 0px solid #ffffff;
 color:#ffffff;
+cursor: pointer;
 }
 
 .sec-button{
@@ -150,6 +151,7 @@ border-radius: 200px;
 background: #F3F3F3;
 border: 0px solid #ffffff;
 color:#000000;
+cursor: pointer;
 }
 
 .sm-button{
@@ -173,6 +175,7 @@ border-radius: 200px;
 background: #F04DCC;
 color: #FFFFFF;
 justify-content: center;
+cursor: pointer;
 }
 
 .md2-button-pri{
@@ -289,6 +292,7 @@ align-self: stretch;
 min-height: 48px;
 border-radius: 16px;
 background: #EBEAEA;
+flex: 1 0;
 }
 .standalone-checkbox{
   display: flex;
@@ -298,7 +302,7 @@ align-self: stretch;
 }
 .form-footer{
   display: flex;
-padding-top: 8px;
+padding-top: 16px;
 flex-direction: column;
 align-items: flex-end;
 gap: 10px;

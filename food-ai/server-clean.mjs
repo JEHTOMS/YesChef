@@ -123,11 +123,14 @@ app.post(ROUTES.STORES, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
+    version: 'v2.1',
     timestamp: new Date().toISOString(),
     environment: {
       openai: !!process.env.OPENAI_API_KEY,
       google: !!process.env.GOOGLE_API_KEY && !!process.env.GOOGLE_SEARCH_ENGINE_ID,
-      ytCookie: !!process.env.YT_COOKIE
+      ytCookie: !!process.env.YT_COOKIE,
+      stripe: !!process.env.STRIPE_SECRET_KEY,
+      supabase: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     }
   });
 });
@@ -258,7 +261,8 @@ app.post('/api/speech/stt', async (req, res) => {
       'go to step', 'skip to step', 'jump to step',
       'what\'s next', 'move on', 'continue', 'done', 'finished',
       'how long', 'how much', 'what temperature',
-      'stop', 'pause', 'wait', 'hold on'
+      'stop', 'pause', 'wait', 'hold on',
+      'start the timer', 'start timer', 'set timer', 'yes start it', 'no timer', 'skip timer'
     ];
 
     // Add recipe-specific hints if provided (ingredient names, recipe name, etc.)
@@ -336,7 +340,8 @@ app.post('/api/speech/process', async (req, res) => {
       'go to step', 'skip to step', 'jump to step', 'start', 'yes', 'begin', 'ready',
       'what\'s next', 'move on', 'continue', 'done', 'finished',
       'how long', 'how much', 'what temperature',
-      'stop', 'pause', 'wait', 'hold on'
+      'stop', 'pause', 'wait', 'hold on',
+      'start the timer', 'start timer', 'set timer', 'yes start it', 'no timer', 'skip timer'
     ];
     let extraHints = [];
     try { const h = req.body.hints; if (h) { extraHints = JSON.parse(h); if (!Array.isArray(extraHints)) extraHints = []; } } catch {}
@@ -800,6 +805,119 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
   }
 });
 
+// Map Stripe price ID to display tier and price string
+const mapPriceId = (priceId) => {
+  if (priceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID) {
+    return { tier: 'annual', price: '$39.99 / year' };
+  }
+  return { tier: 'monthly', price: '$4.99 / month' };
+};
+
+// Fetch live subscription status including pending changes
+app.post('/api/stripe/subscription-status', async (req, res) => {
+  if (!stripe || !supabaseAdmin) {
+    return res.status(503).json({ error: 'Payment service not configured' });
+  }
+
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Step 1: Fetch profile from Supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('subscription_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      console.error('Supabase profile query error:', profileError.message, profileError.code);
+    }
+
+    if (!profile?.subscription_id) {
+      return res.json({
+        hasSubscription: false,
+        cancelAtPeriodEnd: false,
+        pendingPlanChange: null,
+      });
+    }
+
+    // Step 2: Retrieve subscription from Stripe
+    let subscription;
+    try {
+      subscription = await stripe.subscriptions.retrieve(profile.subscription_id);
+    } catch (stripeErr) {
+      console.error('Stripe subscription retrieve failed:', stripeErr.message);
+      return res.json({
+        hasSubscription: false,
+        cancelAtPeriodEnd: false,
+        pendingPlanChange: null,
+      });
+    }
+
+    // Step 3: Process pending plan changes
+    // Check pending_update (API-driven changes) and subscription schedule (Portal-driven changes)
+    let pendingPlanChange = null;
+
+    const currentPriceId = subscription.items.data[0]?.price?.id;
+
+    if (subscription.pending_update) {
+      try {
+        const pendingPriceId = subscription.pending_update.subscription_items?.[0]?.price;
+        const { tier, price } = mapPriceId(pendingPriceId);
+        const expiresAt = subscription.pending_update.expires_at;
+        pendingPlanChange = {
+          newTier: tier,
+          newPrice: price,
+          effectiveDate: expiresAt ? new Date(expiresAt * 1000).toISOString() : null,
+        };
+      } catch (pendingErr) {
+        console.error('Error processing pending_update:', pendingErr.message);
+      }
+    }
+
+    // Check subscription schedule (Stripe Portal uses this for plan switches at period end)
+    if (!pendingPlanChange && subscription.schedule) {
+      try {
+        const schedule = await stripe.subscriptionSchedules.retrieve(subscription.schedule);
+        // Look for the next phase with a different price
+        const phases = schedule.phases || [];
+        for (let i = 1; i < phases.length; i++) {
+          const phasePriceId = phases[i].items?.[0]?.price;
+          if (phasePriceId && phasePriceId !== currentPriceId) {
+            const { tier, price } = mapPriceId(phasePriceId);
+            pendingPlanChange = {
+              newTier: tier,
+              newPrice: price,
+              effectiveDate: new Date(phases[i].start_date * 1000).toISOString(),
+            };
+            break;
+          }
+        }
+      } catch (scheduleErr) {
+        console.error('Error fetching subscription schedule:', scheduleErr.message);
+      }
+    }
+
+    // Step 4: Build safe response
+    const cancelAt = subscription.cancel_at;
+    const currentPeriodEnd = subscription.current_period_end;
+
+    res.json({
+      hasSubscription: true,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+      cancelAt: cancelAt ? new Date(cancelAt * 1000).toISOString() : null,
+      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString() : null,
+      pendingPlanChange,
+    });
+  } catch (error) {
+    console.error('Subscription status error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch subscription status', detail: error.message });
+  }
+});
+
 // Stripe webhook — processes payment confirmations
 app.post('/api/stripe/webhook', async (req, res) => {
   if (!stripe || !supabaseAdmin) {
@@ -916,10 +1034,12 @@ app.post('/api/stripe/webhook', async (req, res) => {
               subscription_tier: tier,
               subscription_id: subscription.id,
               subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              cancel_at_period_end: subscription.cancel_at_period_end || false,
+              cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
             })
             .eq('id', profile.id);
 
-          console.log(`📋 Subscription ${event.type}: user ${profile.id}, status=${status}, tier=${tier}`);
+          console.log(`📋 Subscription ${event.type}: user ${profile.id}, status=${status}, tier=${tier}, cancel_at_period_end=${subscription.cancel_at_period_end}`);
         }
         break;
       }
@@ -942,6 +1062,8 @@ app.post('/api/stripe/webhook', async (req, res) => {
               subscription_tier: null,
               subscription_id: null,
               subscription_current_period_end: null,
+              cancel_at_period_end: false,
+              cancel_at: null,
             })
             .eq('id', profile.id);
           console.log(`❌ Subscription canceled for user ${profile.id}`);
@@ -1062,6 +1184,40 @@ app.post('/api/recipes/save', async (req, res) => {
   } catch (error) {
     console.error('Save recipe error:', error);
     res.status(500).json({ error: 'Failed to save recipe' });
+  }
+});
+
+// ── Delete Account ──────────────────────────────────────────────────────────
+app.post('/api/auth/delete-account', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Database service not configured' });
+  }
+
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Delete user data in order (respecting foreign key constraints)
+    await supabaseAdmin.from('credit_transactions').delete().eq('user_id', userId);
+    await supabaseAdmin.from('saved_recipes').delete().eq('user_id', userId);
+    await supabaseAdmin.from('profiles').delete().eq('id', userId);
+
+    // Delete the auth user
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (authError) {
+      console.error('Auth deletion error:', authError);
+      return res.status(500).json({ error: 'Failed to delete auth account' });
+    }
+
+    console.log(`🗑️ Account deleted for user ${userId}`);
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

@@ -44,7 +44,9 @@ const ROUTES = {
   SPEECH_PROCESS: '/api/speech/process',
   STRIPE_CHECKOUT: '/api/stripe/create-checkout-session',
   STRIPE_PORTAL: '/api/stripe/create-portal-session',
+  STRIPE_SUBSCRIPTION_STATUS: '/api/stripe/subscription-status',
   RECIPE_SAVE: '/api/recipes/save',
+  DELETE_ACCOUNT: '/api/auth/delete-account',
 };
 
 // Full API URLs
@@ -59,7 +61,9 @@ const API_ENDPOINTS = {
   SPEECH_PROCESS: `${API_BASE_URL}/api/speech/process`,
   STRIPE_CHECKOUT: `${API_BASE_URL}/api/stripe/create-checkout-session`,
   STRIPE_PORTAL: `${API_BASE_URL}/api/stripe/create-portal-session`,
+  STRIPE_SUBSCRIPTION_STATUS: `${API_BASE_URL}/api/stripe/subscription-status`,
   RECIPE_SAVE: `${API_BASE_URL}/api/recipes/save`,
+  DELETE_ACCOUNT: `${API_BASE_URL}/api/auth/delete-account`,
 };
 
 const OPENAI_CONFIG = {
