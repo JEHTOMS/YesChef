@@ -1,21 +1,36 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useRecipe } from '../context/RecipeContext';
+import { useSavedRecipes } from '../context/SavedRecipesContext';
+import { useModal } from '../context/ModalContext';
+import { useUser } from '../context/UserContext';
 import { LocationService } from '../services/locationService';
+import { supabase } from '../lib/supabase';
 import './Home.css';
 import '../index.css';
-import Navbar from "../components/Navbar";
+import NewNavbar from "../NewUI/NewNavbar";
+import Modal from "../NewUI/Modal";
 import '../pages/FoodInfo.css';
 import Footer from "../components/Footer";
 import Ingredients from "../components/Ingredients";
 import Stores from "../components/Stores";
 import Directions from "../components/Directions";
 import Steps from "../components/Steps";
+import { useVoice } from "../context/VoiceContext";
 
 function FoodInformation() {
     const navigate = useNavigate();
-    const { recipeData, subtitleData, getServingMultiplier, getDisplayName, getVideoDuration } = useRecipe();
-    const [activeTab, setActiveTab] = useState('ingredients');
+    const { recipeData, subtitleData, getServingMultiplier, getDisplayName, getVideoDuration, originalQuery } = useRecipe();
+    const { saveRecipe, unsaveRecipe, isRecipeSaved, getSavedRecipeId } = useSavedRecipes();
+    const { openUnsaveConfirmModal } = useModal();
+    const { session, getProfileInitial, refreshProfile, isPro, loading: userLoading } = useUser();
+    const [activeTab, setActiveTab] = useState(() => {
+        return sessionStorage.getItem('yeschef_active_tab') || 'ingredients';
+    });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalType, setModalType] = useState('signup');
+    const [authLoading, setAuthLoading] = useState(false);
+    const [authMessage, setAuthMessage] = useState(null);
     const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
     const [isModalClosing, setIsModalClosing] = useState(false);
     const [stores, setStores] = useState([]);
@@ -27,6 +42,181 @@ function FoodInformation() {
     const [allSelected, setAllSelected] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const toastTimerRef = useRef(null);
+
+    // Check if current recipe is saved
+    const recipeSaved = isRecipeSaved(recipeData);
+
+    // Handle save recipe
+    const handleSaveRecipe = async () => {
+        if (!session) {
+            openSignUpModal();
+            return;
+        }
+        try {
+            await saveRecipe(recipeData, originalQuery, getDisplayName());
+            refreshProfile(); // Update credit balance
+        } catch (err) {
+            if (err.message === 'INSUFFICIENT_CREDITS') {
+                navigate('/plans', { state: { from: '/food-information' } });
+                return;
+            }
+            console.error('Error saving recipe:', err);
+        }
+    };
+
+    // Handle unsave recipe
+    const handleUnsaveRecipe = () => {
+        const recipe = recipeData?.recipe || recipeData;
+        const recipeId = getSavedRecipeId(recipeData);
+        if (recipeId) {
+            openUnsaveConfirmModal(
+                recipe?.title || 'this recipe',
+                recipeId,
+                async (data) => {
+                    try {
+                        await unsaveRecipe(data.recipeId);
+                    } catch (err) {
+                        console.error('Error unsaving recipe:', err);
+                    }
+                }
+            );
+        }
+    };
+
+    // No need to fetch display name anymore - using UserContext
+
+    // Modal handlers
+    const openSignUpModal = () => {
+        setModalType('signup');
+        setAuthMessage('');
+        setIsModalOpen(true);
+    };
+
+    const openSignInModal = () => {
+        setModalType('signin');
+        setAuthMessage(null);
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setAuthMessage(null);
+    };
+
+    // Auth handler
+    const handleAuth = async (email, isSignUp = false) => {
+        setAuthLoading(true);
+        setAuthMessage(null);
+
+        const emailRedirectTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+        
+        const { error } = await supabase.auth.signInWithOtp({
+            email: email,
+            options: {
+                emailRedirectTo,
+                shouldCreateUser: isSignUp,
+            }
+        });
+        
+        if (error) {
+            if (error.message.includes('Signups not allowed')) {
+                setAuthMessage(
+                    <>No account found with this email. Please <span><button type="button" onClick={(e) => { e.preventDefault(); openSignUpModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>sign up</button></span> first.</>
+                );
+            } else {
+                setAuthMessage(`Error: ${error.message}`);
+            }
+        } else {
+            setAuthMessage('Check your email for the magic link!');
+        }
+        setAuthLoading(false);
+    };
+
+    const handleGoogleAuth = async () => {
+        localStorage.setItem('yeschef_auth_return', '/food-information');
+        const redirectTo = `${window.location.origin}`;
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo }
+        });
+    };
+
+    // Modal content based on type
+    const getModalConfig = () => {
+        if (modalType === 'signup') {
+            return {
+                title: "Create account",
+                subtitle: "Sign up to save your favourite recipes",
+                content: (
+                    <div style={{width: "100%"}}>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const email = e.target.email.value;
+                            handleAuth(email, true);
+                        }} className="form">
+                            <div className="form-input">
+                                <label className="input-label text-lg" htmlFor="email">Email address <p className="input-subtitle text-sm">We'll send you a link to sign in</p></label>
+                                <input className="text-input text-lg" type="email" name="email" id="email" required disabled={authLoading} />
+                            </div>
+
+                            <div className="standalone-checkbox">
+                                <input type="checkbox" id="email-updates" name="email-updates" />
+                                <label className="input-label text-lg" htmlFor="email-updates">Send me email about updates</label>
+                            </div>
+                            {authMessage && (
+                                <div className="validation-box">
+                                   <p className="text-sm pri-color" style={{textAlign:"center"}}>{authMessage}</p> 
+                                </div>
+                            )}
+                            <div className="form-footer" style={{alignItems: "center"}}>
+                                <p className="footer-text">By continuing, you agree to our <span><a href="/terms-of-service" style={{textDecoration:"underline"}}>Terms of Service</a></span> and <span><a href="/privacy-policy" style={{textDecoration:"underline"}}>Privacy Policy</a></span>.</p>
+                                <input className="pri-button text-lg" id="sign-up-button" type="submit" value={authLoading ? "Sending..." : "Sign up"} disabled={authLoading} />
+                                <div className="auth-divider"><span className="text-sm content-sec-color">or</span></div>
+                                <button type="button" className="sec-button text-lg" onClick={handleGoogleAuth} style={{width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer"}}>
+                                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                                    Continue with Google
+                                </button>
+                                <p className="text-lg">Already have an account? <span><button type="button" onClick={(e) => { e.preventDefault(); openSignInModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>Sign In</button></span></p>
+                            </div>
+                         </form>
+                    </div>
+                )
+            };
+        } else {
+            return {
+                title: "Welcome back!",
+                subtitle: "Sign in to access your saved recipes",
+                content: (
+                    <div style={{width: "100%"}}>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const email = e.target['signin-email'].value;
+                            handleAuth(email, false);
+                        }} className="form">
+                            <div className="form-input">
+                                <label className="input-label text-lg" htmlFor="signin-email">Email address <p className="input-subtitle text-sm">We'll send you a link to sign in</p></label>
+                                <input className="text-input text-lg" type="email" name="signin-email" id="signin-email" required disabled={authLoading} />
+                            </div>
+                            {authMessage && (
+                                <div className="validation-box">
+                                   <p className="text-sm pri-color" style={{textAlign:"center"}}>{authMessage}</p>
+                                </div>
+                            )}
+                            <div className="form-footer" style={{alignItems: "center"}}>
+                                <input className="pri-button text-lg" id="sign-in-button" type="submit" value={authLoading ? "Sending..." : "Sign in"} disabled={authLoading} />
+                                <div className="auth-divider"><span className="text-sm content-sec-color">or</span></div>
+                                <button type="button" className="sec-button text-lg" onClick={handleGoogleAuth} style={{width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer"}}>
+                                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                                    Continue with Google
+                                </button>
+                                <p className="text-lg">Don't have an account? <span><button type="button" onClick={(e) => { e.preventDefault(); openSignUpModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>Sign up</button></span></p>
+                            </div>
+                         </form>
+                    </div>
+                )
+            };
+        }
+    };
 
     // Redirect to home if no recipe data is available
     useEffect(() => {
@@ -45,9 +235,16 @@ function FoodInformation() {
     
     // Get serving multiplier from context
     const servingMultiplier = getServingMultiplier();
+    const { setServingMultiplier } = useVoice();
+
+    // Keep voice context in sync with serving multiplier
+    useEffect(() => {
+        setServingMultiplier(servingMultiplier);
+    }, [servingMultiplier, setServingMultiplier]);
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
+        sessionStorage.setItem('yeschef_active_tab', tab);
     };
 
     const openStoresModal = async () => {
@@ -211,10 +408,12 @@ function FoodInformation() {
     };
 
     // Use API data only - no fallback demo data
+    // Handle both nested (recipeData.recipe) and flat (recipeData) structures
+    const recipe = recipeData?.recipe || recipeData;
     const ingredients = useMemo(() => (
-        recipeData ? transformIngredients(recipeData.recipe?.ingredients || []) : []
-    ), [recipeData]);
-    const directions = recipeData ? transformDirections(recipeData.recipe?.steps || []) : [];
+        recipeData ? transformIngredients(recipe?.ingredients || []) : []
+    ), [recipeData, recipe]);
+    const directions = recipeData ? transformDirections(recipe?.steps || []) : [];
 
     // Don't render anything if no recipe data (will redirect)
     if (!recipeData) {
@@ -224,9 +423,23 @@ function FoodInformation() {
     return (
         <div className="page food-info-page">
             <div className="header">
-                <Navbar 
-                    showBackButton={true} 
-                    foodName={getDisplayName()} 
+                <NewNavbar 
+                    showBackButton={true}
+                    showFoodName={true}
+                    foodName={getDisplayName()}
+                    showCreditsButton={!userLoading && !!session}
+                    credits={Math.max(1, Array.isArray(recipe?.steps) ? recipe.steps.length : 1)}
+                    isPro={isPro}
+                    showProfileButton={!userLoading && !!session}
+                    profileInitial={getProfileInitial()}
+                    showAuthButtons={!userLoading && !session}
+                    isRecipeSaved={recipeSaved}
+                    onSaveRecipe={handleSaveRecipe}
+                    onUnsaveRecipe={handleUnsaveRecipe}
+                    onBackClick={() => navigate('/food-overview')}
+                    onProfileClick={() => navigate('/menu', { state: { from: '/food-information' } })}
+                    onSignIn={openSignInModal}
+                    onSignUp={openSignUpModal}
                 />
                 <div className="tab-bar">
                     <div className="segmented-controls" data-active={activeTab}>
@@ -278,7 +491,7 @@ function FoodInformation() {
                             }}
                         /></div>
                     ) : (
-                        <Directions ref={directionsRef} steps={directions} onActiveChange={(i) => setActiveDirectionIndex(i)} />
+                        <Directions ref={directionsRef} steps={directions} onActiveChange={(i) => setActiveDirectionIndex(i)} ingredients={ingredients} servingMultiplier={servingMultiplier} />
                     )}
                 </div>
             </div>
@@ -342,7 +555,7 @@ function FoodInformation() {
             )}
 
             {activeTab === 'directions' && (
-                <Steps steps={directions} activeStep={activeDirectionIndex} onStepClick={(i) => {
+                <Steps steps={directions} activeStep={activeDirectionIndex} recipeName={recipe?.title || ''} onStepClick={(i) => {
                     if (directionsRef.current && typeof directionsRef.current.goToStep === 'function') {
                         directionsRef.current.goToStep(i);
                     } else {
@@ -355,7 +568,7 @@ function FoodInformation() {
             {/* Stores Modal */}
             {isStoresModalOpen && (
                 <div 
-                    className={`modal-overlay ${isModalClosing ? 'closing' : ''}`} 
+                    className={`stores-modal-overlay ${isModalClosing ? 'closing' : ''}`}
                     onClick={handleOverlayClick}
                 >
                     <Stores 
@@ -371,6 +584,13 @@ function FoodInformation() {
                     Ingredients copied
                 </div>
             )}
+            <Modal 
+                title={getModalConfig().title}
+                subtitle={getModalConfig().subtitle}
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                content={getModalConfig().content}
+            />
         </div>
     );
 }

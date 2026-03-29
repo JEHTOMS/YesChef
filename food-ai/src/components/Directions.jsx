@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useVoice } from "../context/VoiceContext";
+import { parseTimeToSeconds } from '../utils/timeUtils';
+import timerBridge from '../timerBridge';
 import '../index.css';
 import '../pages/Home.css';
 import './Directions.css';
@@ -12,9 +15,12 @@ import { Mousewheel, Keyboard } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/mousewheel';
 
-const Directions = forwardRef(function Directions({ steps = [], onActiveChange }, ref) {
+const Directions = forwardRef(function Directions({ steps = [], onActiveChange, ingredients = [], servingMultiplier = 1 }, ref) {
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const swiperRef = useRef(null);
+    // When we change slides programmatically (voice nav / clicking a step), don't auto-pause voice mode.
+    const suppressVoicePauseRef = useRef(false);
+    const suppressResetTimeoutRef = useRef(null);
     // timers state (seconds remaining) keyed by unique timer ID (stepIndex-timerIndex)
     const [timers, setTimers] = useState({});
     const intervalsRef = useRef({});
@@ -23,6 +29,9 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
     // track whether we've auto-played the alarm for a given step index
     const alarmPlayedRef = useRef({});
     const [shimmerTrigger, setShimmerTrigger] = useState(null);
+
+    // Voice context — stop voice mode when user manually swipes
+    const { isVoiceModeActive, stopVoiceMode, setCurrentReadingIndex, currentReadingIndex } = useVoice();
 
     const formatTime = useCallback((secs) => {
         if (secs == null) return '0:00';
@@ -34,49 +43,7 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
         return `${m}:${String(sec).padStart(2, '0')}`;
     }, []);
 
-    // Parse a step.time value into seconds.
-    // Accepts numbers (minutes), strings like '5', '5 mins', '1:30', '90s', or hours like '1.5 hours', '1 hr', '2h'.
-    const parseTimeToSeconds = useCallback((timeValue) => {
-        if (timeValue == null) return 0;
-        // If already a finite number, assume minutes
-        if (typeof timeValue === 'number' && Number.isFinite(timeValue)) {
-            return Math.max(0, Math.floor(timeValue * 60));
-        }
-        const s = String(timeValue).trim();
-        if (!s) return 0;
-
-        // If format mm:ss or m:ss
-        if (/^\d+:\d{1,2}$/.test(s)) {
-            const [mins, secs] = s.split(':').map(Number);
-            if (Number.isFinite(mins) && Number.isFinite(secs)) {
-                return Math.max(0, mins * 60 + Math.floor(secs));
-            }
-        }
-
-        // Hours like '1.5 hours', '1 hr', '2h'
-        const hoursMatch = s.match(/([0-9]*\.?[0-9]+)\s*(h|hr|hrs|hour|hours)\b/i);
-        if (hoursMatch) {
-            const num = Number(hoursMatch[1]);
-            if (Number.isFinite(num)) return Math.max(0, Math.floor(num * 3600));
-        }
-
-        // If contains seconds unit like '90s' or '30 sec'
-        const secondsMatch = s.match(/(\d+)\s*s(ec)?/i);
-        if (secondsMatch) return Math.max(0, Number(secondsMatch[1]));
-
-        // Extract a leading number (could be minutes)
-        const numMatch = s.match(/([0-9]*\.?[0-9]+)/);
-        if (numMatch) {
-            const num = Number(numMatch[1]);
-            if (Number.isFinite(num)) {
-                // default assume minutes unless string contains 'sec' or 's'
-                const isSeconds = /sec|s\b/i.test(s) && !/min/i.test(s);
-                return Math.max(0, Math.floor(isSeconds ? num : num * 60));
-            }
-        }
-
-        return 0;
-    }, []);
+    // parseTimeToSeconds is now imported from utils/timeUtils.js
 
     const clearTimer = useCallback((timerId) => {
         const id = intervalsRef.current[timerId];
@@ -96,8 +63,16 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                 if (cur <= 1) {
                     // reach zero, stop interval and set 0
                     clearTimer(timerId);
+                    // Sync bridge remaining to 0
+                    if (timerBridge.activeTimers[timerId]) {
+                        timerBridge.activeTimers[timerId].remaining = 0;
+                    }
                     // mark 0 and allow playing alarm below via effect
                     return { ...prev, [timerId]: 0 };
+                }
+                // Sync bridge with remaining time
+                if (timerBridge.activeTimers[timerId]) {
+                    timerBridge.activeTimers[timerId].remaining = cur - 1;
                 }
                 return { ...prev, [timerId]: cur - 1 };
             });
@@ -110,11 +85,63 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
         startTimer(timerId, initialSeconds);
     }, [clearTimer, startTimer]);
 
+    // Register startTimerFn on the bridge so VoiceContext can start timers programmatically
+    useEffect(() => {
+        timerBridge.startTimerFn = (stepIndex, timeText, seconds) => {
+            // Replicate the replacement-finding logic to resolve the correct timerId
+            const raw = steps[stepIndex]?.text || steps[stepIndex]?.instruction || '';
+            if (!raw) return;
+
+            const replacements = [];
+            const heatPattern = /\b(?:(?:over|on|at|to)\s+)?((?:low|medium(?:\s*-\s*(?:low|high)|\s+(?:to|heat))?|medium\s*-\s*high|high)(?:\s+heat)?|\d{2,3}°[FC]?|\d{2,3}\s*degrees?\s*[FC]?)\b/gi;
+            const timePattern = /\b(?:about\s+)?(\d+(?:\.\d+)?(?::\d{1,2})?)\s*(?:to\s+\d+\s*)?(h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|seconds)\b/gi;
+
+            let match;
+            heatPattern.lastIndex = 0;
+            while ((match = heatPattern.exec(raw)) !== null) {
+                replacements.push({ start: match.index, type: 'heat' });
+            }
+            timePattern.lastIndex = 0;
+            while ((match = timePattern.exec(raw)) !== null) {
+                replacements.push({ start: match.index, type: 'time', text: match[0] });
+            }
+            replacements.sort((a, b) => a.start - b.start);
+
+            // Find the replacement index that matches our timer text
+            const idx = replacements.findIndex(r => r.type === 'time' && r.text === timeText);
+            if (idx >= 0) {
+                const timerId = `${stepIndex}-${idx}`;
+                startTimer(timerId, seconds);
+                timerBridge.activeTimers[timerId] = { stepIndex, seconds, label: timeText, remaining: seconds };
+            }
+        };
+        return () => { timerBridge.startTimerFn = null; };
+    }, [startTimer, steps]);
+
+    // Listen for voice-initiated timer start events (fallback)
+    useEffect(() => {
+        const handler = (e) => {
+            const { stepIndex, seconds, label } = e.detail;
+            if (timerBridge.startTimerFn) {
+                timerBridge.startTimerFn(stepIndex, label, seconds);
+            }
+        };
+        window.addEventListener('yeschef:timer-start', handler);
+        return () => window.removeEventListener('yeschef:timer-start', handler);
+    }, []);
+
     // cleanup on unmount
     useEffect(() => {
         return () => {
             Object.values(intervalsRef.current).forEach((id) => clearInterval(id));
             intervalsRef.current = {};
+            // Clear bridge state
+            timerBridge.activeTimers = {};
+            timerBridge.startTimerFn = null;
+            if (suppressResetTimeoutRef.current) {
+                clearTimeout(suppressResetTimeoutRef.current);
+                suppressResetTimeoutRef.current = null;
+            }
             // stop audio on unmount
             if (alarmRef.current) {
                 try { alarmRef.current.pause(); alarmRef.current.currentTime = 0; } catch (e) {}
@@ -129,16 +156,52 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
             
             // Jump to slide if activeStepIndex is changed externally
             if (swiper.activeIndex !== activeStepIndex) {
+                suppressVoicePauseRef.current = true;
                 swiper.slideTo(activeStepIndex, 600);
+                // Clear suppress flag after animation completes
+                if (suppressResetTimeoutRef.current) clearTimeout(suppressResetTimeoutRef.current);
+                suppressResetTimeoutRef.current = setTimeout(() => {
+                    suppressVoicePauseRef.current = false;
+                    suppressResetTimeoutRef.current = null;
+                }, 700);
             }
         }
     }, [activeStepIndex]);
+
+    // Keep swiper aligned to voice reading index (auto-scroll when voice says next step)
+    useEffect(() => {
+        if (currentReadingIndex == null || currentReadingIndex < 0) return;
+        if (!swiperRef.current?.swiper) return;
+        const swiper = swiperRef.current.swiper;
+        if (swiper.activeIndex !== currentReadingIndex) {
+            suppressVoicePauseRef.current = true;
+            swiper.slideTo(currentReadingIndex, 600);
+            if (suppressResetTimeoutRef.current) clearTimeout(suppressResetTimeoutRef.current);
+            suppressResetTimeoutRef.current = setTimeout(() => {
+                suppressVoicePauseRef.current = false;
+                suppressResetTimeoutRef.current = null;
+            }, 700);
+        }
+    }, [currentReadingIndex]);
     
     // Handle slide change from Swiper
     const handleSlideChange = (swiper) => {
-        setActiveStepIndex(swiper.activeIndex);
+        const newIndex = swiper.activeIndex;
+        setActiveStepIndex(newIndex);
+
+        const isSuppressed = suppressVoicePauseRef.current;
+
+        // Always keep voice index synced to the currently visible step
+        // so resume continues from exactly where the user is.
+        setCurrentReadingIndex(newIndex);
+
+        // If voice mode is active, stop it when user manually scrolls
+        if (isVoiceModeActive && !isSuppressed) {
+            stopVoiceMode();
+        }
+
         if (typeof onActiveChange === 'function') {
-            onActiveChange(swiper.activeIndex);
+            onActiveChange(newIndex);
         }
     };
 
@@ -178,13 +241,31 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
     }, []);
 
     // when a timer reaches 0 and its step is active, play the alarm once; allow one replay while still active
+    // Also dispatch yeschef:timer-complete for voice-started timers tracked in the bridge
     useEffect(() => {
+        // Dispatch timer-complete events for any bridge-tracked timer that hit zero
+        Object.keys(timers).forEach(timerId => {
+            if (timers[timerId] === 0 && timerBridge.activeTimers[timerId]) {
+                const timerInfo = timerBridge.activeTimers[timerId];
+                if (!timerInfo._notified) {
+                    timerInfo._notified = true;
+                    window.dispatchEvent(new CustomEvent('yeschef:timer-complete', {
+                        detail: {
+                            timerId,
+                            stepIndex: timerInfo.stepIndex,
+                            label: timerInfo.label
+                        }
+                    }));
+                }
+            }
+        });
+
         // check if any timer for the current active step has reached 0
         const activeTimerPrefix = `${activeStepIndex}-`;
-        const hasZeroTimer = Object.keys(timers).some(timerId => 
+        const hasZeroTimer = Object.keys(timers).some(timerId =>
             timerId.startsWith(activeTimerPrefix) && timers[timerId] === 0
         );
-        
+
         if (hasZeroTimer) {
             // only auto-play once per activation unless re-started
             if (!alarmPlayedRef.current[activeStepIndex]) {
@@ -201,7 +282,14 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
     // Navigate directly to a specific step (stable callback so hooks lint is satisfied)
     const goToStep = useCallback((index) => {
         if (swiperRef.current?.swiper) {
+            suppressVoicePauseRef.current = true;
             swiperRef.current.swiper.slideTo(index, 600);
+            // Clear suppress flag after animation completes
+            if (suppressResetTimeoutRef.current) clearTimeout(suppressResetTimeoutRef.current);
+            suppressResetTimeoutRef.current = setTimeout(() => {
+                suppressVoicePauseRef.current = false;
+                suppressResetTimeoutRef.current = null;
+            }, 700);
         }
     }, []);
 
@@ -340,6 +428,76 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                                                     });
                                                 }
 
+                                                // Find ingredient quantities to scale
+                                                if (servingMultiplier !== 1 && ingredients.length > 0) {
+                                                    // Build a set of ranges already claimed by heat/time
+                                                    const claimed = replacements.map(r => [r.start, r.end]);
+
+                                                    // Also skip "Step N" patterns so step numbers don't get scaled
+                                                    const stepNumPattern = /\bstep\s+\d+/gi;
+                                                    let stepMatch;
+                                                    while ((stepMatch = stepNumPattern.exec(raw)) !== null) {
+                                                        claimed.push([stepMatch.index, stepMatch.index + stepMatch[0].length]);
+                                                    }
+
+                                                    const isInClaimed = (s, e) => claimed.some(([cs, ce]) => s < ce && e > cs);
+
+                                                    // Common units to match after a number
+                                                    const unitWords = '(?:cups?|c\\.?|tbsp?s?\\.?|tablespoons?|tsps?\\.?|teaspoons?|oz\\.?|ounces?|lbs?\\.?|pounds?|g\\.?|grams?|kg\\.?|kilograms?|ml\\.?|milliliters?|liters?|l\\.?|quarts?|qt\\.?|pints?|pt\\.?|gallons?|gal\\.?|pinch(?:es)?|dash(?:es)?|cloves?|slices?|pieces?|stalks?|sprigs?|bunche?s?|cans?|packages?|sticks?|heads?)?';
+
+                                                    // Match numbers (including fractions like 1/2, 1 1/2) optionally followed by a unit
+                                                    const qtyPattern = new RegExp(
+                                                        `\\b(\\d+(?:\\.\\d+)?(?:\\s*/\\s*\\d+)?(?:\\s+\\d+/\\d+)?)\\s*${unitWords}\\b`,
+                                                        'gi'
+                                                    );
+
+                                                    let qtyMatch;
+                                                    qtyPattern.lastIndex = 0;
+                                                    while ((qtyMatch = qtyPattern.exec(raw)) !== null) {
+                                                        const numStart = qtyMatch.index;
+                                                        const numEnd = numStart + qtyMatch[1].length;
+
+                                                        // Skip if overlaps with heat/time
+                                                        if (isInClaimed(numStart, numEnd)) continue;
+
+                                                        // Parse the number (handle fractions)
+                                                        const numStr = qtyMatch[1].trim();
+                                                        let originalVal;
+                                                        if (numStr.includes('/')) {
+                                                            const parts = numStr.split(/\s+/);
+                                                            if (parts.length === 2) {
+                                                                // Mixed fraction: "1 1/2"
+                                                                const [num, den] = parts[1].split('/');
+                                                                originalVal = parseFloat(parts[0]) + parseFloat(num) / parseFloat(den);
+                                                            } else {
+                                                                // Simple fraction: "1/2"
+                                                                const [num, den] = parts[0].split('/');
+                                                                originalVal = parseFloat(num) / parseFloat(den);
+                                                            }
+                                                        } else {
+                                                            originalVal = parseFloat(numStr);
+                                                        }
+
+                                                        if (!Number.isFinite(originalVal) || originalVal <= 0) continue;
+
+                                                        const scaled = originalVal * servingMultiplier;
+                                                        // Round to whole number unless fractional makes sense (e.g. 0.5, 1.5 for halves)
+                                                        const remainder = scaled % 1;
+                                                        const keepDecimal = Math.abs(remainder - 0.25) < 0.01 || Math.abs(remainder - 0.5) < 0.01 || Math.abs(remainder - 0.75) < 0.01;
+                                                        const scaledStr = keepDecimal ? scaled.toFixed(1).replace(/\.0$/, '') : String(Math.round(scaled));
+
+                                                        if (scaledStr !== numStr) {
+                                                            replacements.push({
+                                                                start: numStart,
+                                                                end: numEnd,
+                                                                type: 'quantity',
+                                                                text: scaledStr,
+                                                                originalText: numStr
+                                                            });
+                                                        }
+                                                    }
+                                                }
+
                                                 // Sort by position to process in order
                                                 replacements.sort((a, b) => a.start - b.start);
 
@@ -421,6 +579,8 @@ const Directions = forwardRef(function Directions({ steps = [], onActiveChange }
                                                                 <span className="minutes-text">minutes</span>
                                                             </span>
                                                         );
+                                                    } else if (repl.type === 'quantity') {
+                                                        elements.push(repl.text);
                                                     }
 
                                                     lastEnd = repl.end;

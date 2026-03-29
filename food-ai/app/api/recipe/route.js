@@ -53,7 +53,7 @@ Example format:
     "timestamp": 45
   },
   {
-    "text": "Cook the onions for about 5 minutes until softened",
+    "text": "Cook the onions for 5 minutes until softened",
     "heat": null,
     "time": 5,
     "timestamp": 120

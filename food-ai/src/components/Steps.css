@@ -175,6 +175,347 @@ text-align: left;
         transition: all 300ms cubic-bezier(.2,.9,.2,1);
     }
 
+    .audio-container{
+        display: flex;
+        width: 44px;
+        padding: 8px;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        border-radius: 200px;
+        background: #FFF;
+        box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.10);
+        min-height: 44px;
+        cursor: pointer;
+        transition: all 220ms cubic-bezier(.2,.9,.2,1);
+        position: relative;
+    }
+
+    .audio-container.collapsed {
+        gap: 0;
+        height: 44px;
+    }
+
+    .audio-container.collapsed .stopaudio-button {
+        display: none;
+    }
+
+    .audio-container.collapsed .help-icon-button {
+        display: none;
+    }
+
+    .audio-container.collapsed .transcript-bubble {
+        display: none;
+    }
+
+.stopaudio-button{
+        display: flex;
+width: 28px;
+height: 28px;
+padding: 3px;
+justify-content: center;
+align-items: center;
+border-radius: 50%;
+background: #FFD5F6;
+    }
+
+.audio-waveform {
+    width: 28px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.audio-waveform .wave-bar {
+    width: 4px;
+    height: var(--active-height, var(--bar-height, 8px));
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: #F04DCC;
+    transform-origin: center bottom;
+    transition: height 90ms linear;
+}
+
+.audio-waveform.shrunk .wave-bar {
+    height: 4px;
+}
+
+.audio-waveform.thinking.bouncing .wave-bar {
+    animation: dot-bounce 0.8s ease-in-out infinite;
+    animation-delay: var(--dot-delay, 0s);
+}
+
+@keyframes dot-bounce {
+    0%, 100% { transform: translateY(0); }
+    35% { transform: translateY(-5px); }
+    65% { transform: translateY(0); }
+}
+
+
+
+/* Reading step - pulsing highlight */
+.step-item.reading-step {
+    background: rgba(240, 77, 204, 0.12);
+    border-left: 3px solid #F04DCC;
+    animation: pulse-reading 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-reading {
+    0%, 100% {
+        background: rgba(240, 77, 204, 0.12);
+    }
+    50% {
+        background: rgba(240, 77, 204, 0.2);
+    }
+}
+
+.step-item.reading-step .step-number {
+    background: #F04DCC;
+    color: white;
+}
+
+/* Audio container playing state */
+.audio-container.playing {
+    background: linear-gradient(135deg, #FFD5F6 0%, #FFF 100%);
+}
+
+.audio-container.loading {
+    opacity: 1;
+}
+
+.audio-container.recording {
+    background: linear-gradient(135deg, #FFE5E5 0%, #FFF 100%);
+    box-shadow: 0 4px 16px 0 rgba(255, 59, 48, 0.2);
+}
+
+/* Listening state - continuous conversation active */
+.audio-container.listening {
+    background: linear-gradient(135deg, #E5F0FF 0%, #FFF 100%);
+    box-shadow: 0 4px 20px 0 rgba(240, 77, 204, 0.3);
+}
+
+.audio-container.voice-active {
+    border: 2px solid rgba(240, 77, 204, 0.3);
+}
+
+/* Paused state — voice mode active but idle, pulse to hint user can tap to resume */
+.audio-container.paused {
+    border: 2px solid rgba(240, 77, 204, 0.15);
+    animation: pausePulse 2s ease-in-out infinite;
+}
+
+@keyframes pausePulse {
+    0%, 100% { border-color: rgba(240, 77, 204, 0.15); }
+    50% { border-color: rgba(240, 77, 204, 0.45); }
+}
+
+/* Waveform listening animation - subtle breathing effect */
+.audio-waveform.listening .wave-bar {
+    animation: wave-listen 1.2s ease-in-out infinite;
+}
+
+.audio-waveform.listening .wave-bar-1 {
+    animation-delay: 0s;
+}
+.audio-waveform.listening .wave-bar-2 {
+    animation-delay: 0.2s;
+}
+.audio-waveform.listening .wave-bar-3 {
+    animation-delay: 0.4s;
+}
+.audio-waveform.listening .wave-bar-4 {
+    animation-delay: 0.6s;
+}
+
+@keyframes wave-listen {
+    0%, 100% {
+        transform: scaleY(0.6);
+        opacity: 0.6;
+    }
+    50% {
+        transform: scaleY(1);
+        opacity: 1;
+    }
+}
+
+/* Transcript bubble - shows user's speech only */
+.transcript-bubble {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 12px;
+    padding: 10px 16px;
+    background: #1E1E1E;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 16px;
+    max-width: 280px;
+    white-space: normal;
+    word-wrap: break-word;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.15s ease-out;
+    z-index: 100;
+}
+
+/* AI caption styling — subtle distinction */
+.transcript-bubble.ai-caption {
+    background: #2A2A2A;
+    max-width: 320px;
+    font-size: 14px;
+    line-height: 1.4;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.transcript-bubble.ai-caption::after {
+    border-top-color: #2A2A2A;
+}
+
+.transcript-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #1E1E1E;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Waveform tooltip (dynamic via data-tooltip) */
+.audio-waveform[data-tooltip] {
+    position: relative;
+}
+
+.audio-waveform[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    background: #1E1E1E;
+    color: #FFF;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Stop button tooltip */
+.stopaudio-button {
+    position: relative;
+}
+
+.stopaudio-button:hover::after {
+    content: 'Stop voice mode';
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    background: #1E1E1E;
+    color: #FFF;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Help icon button */
+.help-icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+}
+
+.help-icon-button:hover::after {
+    content: 'Quick commands';
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    background: #1E1E1E;
+    color: #FFF;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Hide audio-container tooltips on mobile/touch devices */
+@media (hover: none), (max-width: 768px) {
+    .audio-waveform[data-tooltip]:hover::after,
+    .stopaudio-button:hover::after,
+    .help-icon-button:hover::after {
+        display: none;
+    }
+}
+
+/* Quick commands modal content */
+.quick-commands-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.quick-commands-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quick-commands-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Quick commands modal — scrollable with sticky header on mobile */
+.modal-container:has(.quick-commands-list) {
+    max-height: 640px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-container:has(.quick-commands-list) .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.modal-container:has(.quick-commands-list) .modal-content-wrapper {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
 /* Mobile responsive styles */
 @media (max-width: 768px) {
     .step-list {

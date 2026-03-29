@@ -123,7 +123,7 @@ app.post(ROUTES.STORES, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    version: 'v2.3-jsonly',
+    version: 'v2.1',
     timestamp: new Date().toISOString(),
     environment: {
       openai: !!process.env.OPENAI_API_KEY,
@@ -134,7 +134,6 @@ app.get('/health', (req, res) => {
     }
   });
 });
-
 
 // Clear recipe cache (useful for debugging)
 app.post('/api/clear-cache', (req, res) => {
@@ -262,7 +261,8 @@ app.post('/api/speech/stt', async (req, res) => {
       'go to step', 'skip to step', 'jump to step',
       'what\'s next', 'move on', 'continue', 'done', 'finished',
       'how long', 'how much', 'what temperature',
-      'stop', 'pause', 'wait', 'hold on'
+      'stop', 'pause', 'wait', 'hold on',
+      'start the timer', 'start timer', 'set timer', 'yes start it', 'no timer', 'skip timer'
     ];
 
     // Add recipe-specific hints if provided (ingredient names, recipe name, etc.)
@@ -340,7 +340,8 @@ app.post('/api/speech/process', async (req, res) => {
       'go to step', 'skip to step', 'jump to step', 'start', 'yes', 'begin', 'ready',
       'what\'s next', 'move on', 'continue', 'done', 'finished',
       'how long', 'how much', 'what temperature',
-      'stop', 'pause', 'wait', 'hold on'
+      'stop', 'pause', 'wait', 'hold on',
+      'start the timer', 'start timer', 'set timer', 'yes start it', 'no timer', 'skip timer'
     ];
     let extraHints = [];
     try { const h = req.body.hints; if (h) { extraHints = JSON.parse(h); if (!Array.isArray(extraHints)) extraHints = []; } } catch {}
@@ -857,8 +858,9 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
     }
 
     // Step 3: Process pending plan changes
-    // Check pending_update (API-driven) and subscription schedule (Portal-driven)
+    // Check pending_update (API-driven changes) and subscription schedule (Portal-driven changes)
     let pendingPlanChange = null;
+
     const currentPriceId = subscription.items.data[0]?.price?.id;
 
     if (subscription.pending_update) {
@@ -880,6 +882,7 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
     if (!pendingPlanChange && subscription.schedule) {
       try {
         const schedule = await stripe.subscriptionSchedules.retrieve(subscription.schedule);
+        // Look for the next phase with a different price
         const phases = schedule.phases || [];
         for (let i = 1; i < phases.length; i++) {
           const phasePriceId = phases[i].items?.[0]?.price;
@@ -1125,7 +1128,7 @@ app.post('/api/recipes/save', async (req, res) => {
 
     const newRecipe = {
       user_id: userId,
-      recipe_title: recipe?.title || 'Untitled Recipe',
+      recipe_title: req.body.displayName || recipe?.title || 'Untitled Recipe',
       recipe_image: thumbnail,
       cook_time: recipe?.cookTime || null,
       servings: recipe?.servings || null,
@@ -1181,6 +1184,40 @@ app.post('/api/recipes/save', async (req, res) => {
   } catch (error) {
     console.error('Save recipe error:', error);
     res.status(500).json({ error: 'Failed to save recipe' });
+  }
+});
+
+// ── Delete Account ──────────────────────────────────────────────────────────
+app.post('/api/auth/delete-account', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Database service not configured' });
+  }
+
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Delete user data in order (respecting foreign key constraints)
+    await supabaseAdmin.from('credit_transactions').delete().eq('user_id', userId);
+    await supabaseAdmin.from('saved_recipes').delete().eq('user_id', userId);
+    await supabaseAdmin.from('profiles').delete().eq('id', userId);
+
+    // Delete the auth user
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (authError) {
+      console.error('Auth deletion error:', authError);
+      return res.status(500).json({ error: 'Failed to delete auth account' });
+    }
+
+    console.log(`🗑️ Account deleted for user ${userId}`);
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

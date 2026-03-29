@@ -13,11 +13,15 @@ function Home() {
     const navigate = useNavigate();
     const { recipeData, searchRecipe, loading, error, clearError, cancelRecipeExtraction } = useRecipe();
     const [query, setQuery] = useState('');
+    const [initializing, setInitializing] = useState(true);
 
     // Redirect to food-overview if recipe data exists (from localStorage or previous session)
     useEffect(() => {
         if (recipeData && !loading && !error) {
             navigate("/food-overview");
+        } else {
+            // Content is ready to show - stop shimmer
+            setInitializing(false);
         }
     }, [recipeData, loading, error, navigate]);
 
@@ -49,23 +53,45 @@ function Home() {
         }
     };
 
+    // Shimmer skeleton for initial loading state
+    const ShimmerSkeleton = () => (
+        <div className="main-content">
+            <div className="container layout-sm">
+                <div className="skeleton-input-wrapper">
+                    <div className="skeleton-input-container">
+                        <div className="skeleton-textarea shimmer-bg" />
+                        <div className="skeleton-input-footer">
+                            <div className="skeleton-description shimmer-bg" />
+                            <div className="skeleton-button shimmer-bg" />
+                        </div>
+                    </div>
+                    <div className="skeleton-footer-description shimmer-bg" />
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="page home-page">
             <Navbar></Navbar>
-            <div className="main-content">
-                 <div className="container layout-sm">
-                    <div className="input-wrapper">
-                                    <Input 
-                onRecipeSubmit={handleVideoSubmit} 
-                onSubmit={handleExtractRecipe}
-                isLoading={loading}
-            />
-                        <p className="description text-sm">Create recipe from a text or YouTube link.</p>
+            {initializing ? (
+                <ShimmerSkeleton />
+            ) : (
+                <div className="main-content">
+                    <div className="container layout-sm">
+                        <div className="input-wrapper">
+                            <Input
+                                onRecipeSubmit={handleVideoSubmit}
+                                onSubmit={handleExtractRecipe}
+                                isLoading={loading}
+                            />
+                            <p className="description text-sm">Create recipe from a text or YouTube link.</p>
+                        </div>
                     </div>
-                 </div>
-            </div>
-            
-            <Footer 
+                </div>
+            )}
+
+            <Footer
                 buttonType="primary"
                 primaryButtonText="Create Recipe"
                 onTap={handleExtractRecipe}

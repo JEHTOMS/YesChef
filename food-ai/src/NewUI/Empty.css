@@ -1,0 +1,128 @@
+.empty-state-signin{
+    display: none;
+height: 120px;
+padding: 16px;
+position: relative;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+gap: 16px;
+align-self: stretch;
+border-radius: 24px;
+background: #ECECEC;
+overflow: hidden;
+}
+
+.empty-state-signin svg {
+    width: 72px;
+    height: 72px;
+}
+
+.empty-state-promo{
+    display: flex;
+    position: relative;
+    overflow: hidden;
+padding: 16px 24px;
+flex-direction: column;
+align-items: flex-start;
+gap: 10px;
+align-self: stretch;
+border-radius: 24px;
+background: #420C36;
+transition: padding 0.25s ease, gap 0.25s ease, flex-grow 0.25s ease;
+}
+.promo-expanded {
+    padding: 24px;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex: 1 0 auto;
+}
+.promo-expanded .promo-text {
+    font-size: 24px;
+    line-height: 124%;
+    max-width: none;
+    text-align: center;
+}
+.promo-expanded .create-btn-container {
+    padding-top: 24px;
+    width: 60%;
+}
+.promo-expanded .credit-promo {
+    position: static;
+    width: 156px;
+    height: 169.839px;
+}
+.promo-expanded .promo-deco {
+    position: absolute;
+    left: -110px;
+    top: -90px;
+}
+.promo-text{
+    color: #FFF;
+font-family: "Shippori Antique B1";
+font-size: 20px;
+font-style: normal;
+font-weight: 400;
+line-height: 124%;
+letter-spacing: -0.6px;
+max-width: 390px;
+transition: font-size 0s ease, line-height 0.05s ease, max-width 0.05s ease;
+}
+
+.promo-deco{
+    position: absolute;
+right: -58.989px;
+top: -159px;
+}
+@media (max-width: 480px) {
+    .promo-text {
+        font-size: 16px;
+        max-width: 204px;
+        line-height: 140%;
+    }
+}
+.create-account{
+    background: #2e0525;
+    color: #FFF;
+}
+.credit-promo{
+    position: absolute;
+    right: -18.853px;
+    bottom: -24.7px;
+    z-index: 1;
+    transition: width 0.25s ease, height 0.25s ease;
+}
+.create-btn-container {
+    transition: padding-top 0.25s ease;
+}
+.no-recipe{
+    display: flex;
+        width: 100%;
+height: 120px;
+padding: 24px 16px;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+gap: 8px;
+border-radius: 24px;
+background: #ECECEC;
+}
+@media (min-width: 768px) {
+    .empty-state-signin svg:nth-of-type(1) {
+        width: 89px;
+        height: 89px;
+    }
+    .empty-state-signin svg:nth-of-type(2) {
+        width: 87px;
+        height: 87px;
+    }
+    .empty-state-signin svg:nth-of-type(3) {
+        width: 89px;
+        height: 89px;
+    }
+    .empty-state-signin svg:nth-of-type(4) {
+        width: 95px;
+        height: 95px;
+    }
+}

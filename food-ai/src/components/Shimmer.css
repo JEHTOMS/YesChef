@@ -1,0 +1,84 @@
+/* Shimmer placeholder styles used by Shimmer.jsx and other preview UIs */
+
+@keyframes yc-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+:root {
+  --shimmer-base: #f5f5f5;
+  --shimmer-highlight: #e9ecef;
+}
+
+.savedrecipes-shimmer {
+  width: 100%;
+  height: 120px; /* matches inline height in Shimmer.jsx */
+  border-radius: 24px;
+  background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 37%, var(--shimmer-base) 63%);
+  background-size: 400% 100%;
+  animation: yc-shimmer 3s linear infinite;
+}
+
+.input-shimmer{
+    display: flex;
+padding: 16px;
+flex-direction: column;
+justify-content: flex-end;
+align-items: flex-end;
+gap: 16px;
+height: 100%;
+flex: 1 0 0;
+align-self: stretch;
+background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 37%, var(--shimmer-base) 63%);
+  background-size: 400% 100%;
+  animation: yc-shimmer 3s linear infinite;
+    border-radius: 24px;
+}
+.button-shimmer{
+    display: flex;
+width: 133px;
+height: 42px;
+padding: 10px 16px 12px 16px;
+align-items: center;
+gap: 15px;
+border-radius: 200px;
+background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 37%, var(--shimmer-base) 63%);
+  background-size: 400% 100%;
+  animation: yc-shimmer 3s linear infinite;
+}
+/* Generic shimmer card for reuse */
+.shimmer-card {
+  width: 100%;
+  height: 100px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 37%, var(--shimmer-base) 63%);
+  background-size: 200% 100%;
+  animation: yc-shimmer 1.6s linear infinite;
+}
+
+.shimmer-line {
+  height: 12px;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 37%, var(--shimmer-base) 63%);
+  background-size: 200% 100%;
+  animation: yc-shimmer 1.4s linear infinite;
+}
+
+.main-content {
+  width: 100%;
+  height: 100%;
+}
+
+/* small utility spacing just for preview container alignment */
+.savedrecipes-shimmer.centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

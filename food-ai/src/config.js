@@ -46,6 +46,7 @@ const ROUTES = {
   STRIPE_PORTAL: '/api/stripe/create-portal-session',
   STRIPE_SUBSCRIPTION_STATUS: '/api/stripe/subscription-status',
   RECIPE_SAVE: '/api/recipes/save',
+  DELETE_ACCOUNT: '/api/auth/delete-account',
 };
 
 // Full API URLs
@@ -62,10 +63,11 @@ const API_ENDPOINTS = {
   STRIPE_PORTAL: `${API_BASE_URL}/api/stripe/create-portal-session`,
   STRIPE_SUBSCRIPTION_STATUS: `${API_BASE_URL}/api/stripe/subscription-status`,
   RECIPE_SAVE: `${API_BASE_URL}/api/recipes/save`,
+  DELETE_ACCOUNT: `${API_BASE_URL}/api/auth/delete-account`,
 };
 
 const OPENAI_CONFIG = {
-  MODEL: 'gpt-4o',
+  MODEL: 'gpt-4o-mini',
   TEMPERATURE: 0.0, // Zero hallucination as requested
   MAX_TOKENS: 2000,
 };

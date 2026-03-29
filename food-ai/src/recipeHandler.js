@@ -2,9 +2,65 @@ import { captionsHandler } from './captionsHandler.js';
 import { socialMediaHandler, isSocialMediaUrl } from './socialMediaHandler.js';
 import { OpenAI } from 'openai';
 import { OPENAI_CONFIG } from './config.js';
+import { createClient } from '@supabase/supabase-js';
 
 // Add fetch polyfill
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
+// Supabase admin client for thumbnail storage
+// Lazy-initialized (env vars aren't available at import time due to dotenv loading order)
+let supabaseStorage = null;
+function getSupabaseStorage() {
+  if (!supabaseStorage && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    supabaseStorage = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log('📸 Thumbnail storage: ✅ Supabase connected');
+  }
+  return supabaseStorage;
+}
+
+const THUMBNAIL_BUCKET = 'recipe-thumbnails';
+
+/**
+ * Downloads a temporary image URL and uploads it to Supabase Storage.
+ * Returns the permanent public URL, or null on failure.
+ */
+async function uploadThumbnail(tempUrl, fileName) {
+  const storage = getSupabaseStorage();
+  if (!storage || !tempUrl) return null;
+
+  try {
+    const response = await fetch(tempUrl);
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = await response.buffer();
+
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+    const filePath = `${fileName}.${ext}`;
+
+    const { error } = await storage.storage
+      .from(THUMBNAIL_BUCKET)
+      .upload(filePath, buffer, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Thumbnail upload error:', error.message);
+      return null;
+    }
+
+    const { data: publicData } = storage.storage
+      .from(THUMBNAIL_BUCKET)
+      .getPublicUrl(filePath);
+
+    console.log('✅ Thumbnail uploaded:', publicData.publicUrl);
+    return publicData.publicUrl;
+  } catch (err) {
+    console.error('Thumbnail upload failed:', err.message);
+    return null;
+  }
+}
 
 // Simple in-memory cache to reduce OpenAI API calls
 const recipeCache = new Map();
@@ -202,7 +258,7 @@ Be strict - only return isFood: false with high confidence (>0.8) if you're abso
 
     const response = await callOpenAIWithRetry(async () => {
       return await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
         max_tokens: 100,
@@ -350,7 +406,7 @@ export async function recipeHandler(requestData) {
       };
     }
 
-    const { subtitles, videoId, title, description, platform, originalUrl } = captionData.data;
+    const { subtitles, videoId, title, description, platform, originalUrl, thumbnail } = captionData.data;
     const queryUsed = recipeName || '';
 
     // For social media videos, prioritize description (caption) as it often contains ingredients/steps
@@ -416,14 +472,22 @@ export async function recipeHandler(requestData) {
       console.log(`Processing ${contentSource} content of ${contentToAnalyze.length} characters`);
       const cleanedTitle = extractCleanFoodName(title || queryUsed || 'Recipe');
       const recipeFromTranscript = await extractRecipeFromTranscript(contentToAnalyze, cleanedTitle, contentSource);
-      const imageUrl = await getFoodImage(recipeFromTranscript.title || title, queryUsed);
-      
+      const isYouTube = !platform || platform === 'YouTube';
+      let stableThumbnail = isYouTube && videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+      // For social media, upload the expiring thumbnail to Supabase Storage
+      if (!stableThumbnail && thumbnail) {
+        const uniqueName = `${platform}-${Date.now()}`;
+        stableThumbnail = await uploadThumbnail(thumbnail, uniqueName);
+      }
+      const imageUrl = stableThumbnail || await getFoodImage(recipeFromTranscript.title || title, queryUsed);
+
       const resultData = {
         videoId,
         videoTitle: title,
         videoDescription: description,
         platform: platform || 'YouTube',
         originalUrl: originalUrl || youtubeUrl,
+        thumbnail: stableThumbnail || null,
         recipe: { ...recipeFromTranscript, image: imageUrl }
       };
       
@@ -439,9 +503,26 @@ export async function recipeHandler(requestData) {
         }),
       };
     } else if (title) {
-      console.log('No sufficient transcript found, generating recipe based on video title');
-      const recipeFromTitle = await generateRecipeFromTitle(title);
-      const imageUrl = await getFoodImage(recipeFromTitle.title || title, queryUsed);
+      // If we have the user's original search query, prefer that over a potentially useless video title
+      const isUselessTitle = !title || title.startsWith('Video ') || title.length < 5;
+      const useQuery = queryUsed && (isUselessTitle || queryUsed.length > 3);
+      
+      if (useQuery) {
+        console.log(`No sufficient transcript found — using original query "${queryUsed}" to generate recipe`);
+      } else {
+        console.log(`No sufficient transcript found, generating recipe based on video title: "${title}"`);
+      }
+      
+      const recipeFromTitle = useQuery
+        ? await generateRecipeFromQuery(queryUsed)
+        : await generateRecipeFromTitle(title);
+      const isYouTube2 = !platform || platform === 'YouTube';
+      let stableThumbnail2 = isYouTube2 && videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+      if (!stableThumbnail2 && thumbnail) {
+        const uniqueName = `${platform}-${Date.now()}`;
+        stableThumbnail2 = await uploadThumbnail(thumbnail, uniqueName);
+      }
+      const imageUrl = stableThumbnail2 || await getFoodImage(recipeFromTitle.title || title, queryUsed);
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -453,6 +534,7 @@ export async function recipeHandler(requestData) {
             videoDescription: description,
             platform: platform || 'YouTube',
             originalUrl: originalUrl || youtubeUrl,
+            thumbnail: stableThumbnail2 || null,
             recipe: { ...recipeFromTitle, image: imageUrl }
           }
         }),
@@ -524,13 +606,13 @@ ${sourceContext}
 Content:
 ${content}
 
-IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 4, "calories": 350
+IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 2, "calories": 350. Extract the actual serving size from the content — do NOT default to 4.
 
 Create a JSON response with this exact structure:
 {
   "title": "Recipe name from the video",
   "description": "Brief description of the dish",
-  "servings": 4,
+  "servings": 2,
   "cookTime": "Total cooking time",
   "difficulty": "Easy/Medium/Hard",  
   "calories": 350,
@@ -550,7 +632,7 @@ Create a JSON response with this exact structure:
     },
     {
       "step": 2,
-      "instruction": "Sauté onions over medium heat for about 5 minutes until translucent",
+      "instruction": "Sauté onions over medium heat for 5 minutes until translucent",
       "equipment": "frying pan",
       "ingredients": ["onions", "oil"]
     }
@@ -562,11 +644,11 @@ Create a JSON response with this exact structure:
 
 IMPORTANT FORMATTING RULES:
 - NEVER include "time" or "heat" fields unless the transcript explicitly mentions specific cooking times or heat levels
-- If transcript says "cook for 5 minutes", include that time IN THE INSTRUCTION TEXT: "Cook for about 5 minutes"  
+- If transcript says "cook for 5 minutes", include that time IN THE INSTRUCTION TEXT: "Cook for 5 minutes"
 - If transcript says "medium heat", include that heat IN THE INSTRUCTION TEXT: "Cook over medium heat"
 - DO NOT create separate time/heat fields - embed timing and heat information directly in the instruction text
-- Convert hours to minutes (e.g., "1.5 hours" becomes "about 90 minutes") within instruction text
-- Use SINGLE estimates like "about 5 minutes", "about 12 minutes" - NEVER ranges like "5-7 minutes"
+- Convert hours to minutes (e.g., "1.5 hours" becomes "90 minutes") within instruction text
+- Use SINGLE estimates like "5 minutes", "12 minutes" - NEVER use the word "about" before times - NEVER ranges like "5-7 minutes"
 - ALWAYS include an "ingredients" array for each step listing the specific ingredients used in that step
 - Keep ingredient names simple (e.g., "onions", "garlic", "oil", "flour") matching the main ingredient list
 
@@ -620,13 +702,13 @@ async function generateRecipeFromTitle(videoTitle) {
   
   const prompt = `Based on this video title "${videoTitle}", generate a realistic cooking recipe.
 
-IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 4, "calories": 350
+IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 2, "calories": 350. Extract the actual serving size from the content — do NOT default to 4.
 
 Create a JSON response with this exact structure:
 {
   "title": "Recipe name based on the video title",
   "description": "Brief description",
-  "servings": 4,
+  "servings": 2,
   "cookTime": "Total cooking time",
   "difficulty": "Easy/Medium/Hard",
   "calories": 350,
@@ -646,7 +728,7 @@ Create a JSON response with this exact structure:
     },
     {
       "step": 2,
-      "instruction": "Sauté vegetables over medium heat for about 3 minutes until softened",
+      "instruction": "Sauté vegetables over medium heat for 3 minutes until softened",
       "equipment": "frying pan",
       "ingredients": ["onions", "bell peppers", "oil"]
     }
@@ -658,10 +740,10 @@ Create a JSON response with this exact structure:
 
 IMPORTANT FORMATTING RULES:
 - NEVER include separate "time" or "heat" fields - embed timing and heat information directly in the instruction text
-- If timing is needed, include it IN THE INSTRUCTION: "Cook for about 5 minutes", "Bake for about 25 minutes"
+- If timing is needed, include it IN THE INSTRUCTION: "Cook for 5 minutes", "Bake for 25 minutes"
 - If heat level is needed, include it IN THE INSTRUCTION: "Sauté over medium heat", "Cook on high heat"
-- Convert hours to minutes (e.g., "1.5 hours" becomes "about 90 minutes") within instruction text
-- Use SINGLE estimates like "about 5 minutes", "about 12 minutes" - NEVER ranges like "5-7 minutes"
+- Convert hours to minutes (e.g., "1.5 hours" becomes "90 minutes") within instruction text
+- Use SINGLE estimates like "5 minutes", "12 minutes" - NEVER use the word "about" before times - NEVER ranges like "5-7 minutes"
 - DO NOT create separate time/heat fields - all timing and temperature info goes in instruction text
 - ALWAYS include an "ingredients" array for each step listing the specific ingredients used in that step
 - Keep ingredient names simple (e.g., "onions", "garlic", "oil", "flour") matching the main ingredient list
@@ -698,13 +780,13 @@ async function generateRecipeFromQuery(query) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const prompt = `You are a precise recipe creation AI. Create a realistic, well-structured recipe for "${query}".
 
-IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 4, "calories": 350
+IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 2, "calories": 350. Extract the actual serving size from the content — do NOT default to 4.
 
 Return ONLY valid JSON with this exact schema:
 {
   "title": "Recipe name",
   "description": "Brief description",
-  "servings": 4,
+  "servings": 2,
   "cookTime": "Total cooking time",
   "difficulty": "Easy/Medium/Hard",
   "calories": 350,
@@ -713,7 +795,7 @@ Return ONLY valid JSON with this exact schema:
   ],
   "steps": [
     { "step": 1, "instruction": "Chop vegetables finely", "equipment": "knife", "ingredients": ["onions", "carrots", "celery"] },
-    { "step": 2, "instruction": "Sauté onions over medium heat for about 4 minutes until translucent", "equipment": "pan", "ingredients": ["onions", "oil"] }
+    { "step": 2, "instruction": "Sauté onions over medium heat for 4 minutes until translucent", "equipment": "pan", "ingredients": ["onions", "oil"] }
   ],
   "tools": ["list", "of", "kitchen", "tools"],
   "allergens": ["common", "allergens"],
@@ -722,10 +804,10 @@ Return ONLY valid JSON with this exact schema:
 
 IMPORTANT FORMATTING RULES:
 - NEVER include separate "time" or "heat" fields - embed timing and heat information directly in the instruction text
-- If timing is needed, include it IN THE INSTRUCTION: "Cook for about 10 minutes", "Simmer for about 30 minutes" 
+- If timing is needed, include it IN THE INSTRUCTION: "Cook for 10 minutes", "Simmer for 30 minutes"
 - If heat level is needed, include it IN THE INSTRUCTION: "Cook over medium heat", "Bake at 350°F"
-- Convert hours to minutes (e.g., "1.5 hours" becomes "about 90 minutes") within instruction text
-- Use SINGLE estimates like "about 5 minutes", "about 12 minutes" - NEVER ranges like "5-7 minutes"
+- Convert hours to minutes (e.g., "1.5 hours" becomes "90 minutes") within instruction text
+- Use SINGLE estimates like "5 minutes", "12 minutes" - NEVER use the word "about" before times - NEVER ranges like "5-7 minutes"
 - DO NOT create separate time/heat fields - all timing and temperature info goes in instruction text
 - ALWAYS include an "ingredients" array for each step listing the specific ingredients used in that step
 - Keep ingredient names simple (e.g., "onions", "garlic", "oil", "flour") matching the main ingredient list
@@ -914,13 +996,13 @@ async function searchSpecificFoodImage(searchTerm, apiKey, searchEngineId) {
   try {
     // Clean and enhance the search term for better results
     const cleanQuery = searchTerm
-      .replace(/recipe|food|dish/gi, '') // Remove redundant words
+      .replace(/recipe|food|dish|video|tutorial/gi, '') // Remove redundant words
       .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
     
-    // Create a highly specific query for the exact dish
-    const specificQuery = encodeURIComponent(`"${cleanQuery}" food prepared dish recipe high quality photo`);
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${specificQuery}&searchType=image&num=8&safe=active&imgType=photo&imgSize=large&imgColorType=color&fileType=jpg,png`;
+    // Create a highly specific query for the exact dish with better filters
+    const specificQuery = encodeURIComponent(`${cleanQuery} prepared dish plated food photography`);
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${specificQuery}&searchType=image&num=10&safe=active&imgType=photo&imgSize=large&imgColorType=color&fileType=jpg,png`;
     
     console.log(`🔍 Searching for specific image: "${cleanQuery}"`);
     const response = await fetch(url);
@@ -928,37 +1010,69 @@ async function searchSpecificFoodImage(searchTerm, apiKey, searchEngineId) {
     
     const data = await response.json();
     
-    // Prioritize images that are likely recipe photos
-    const bestImage = data.items?.find(item => {
+    // Filter out images that are likely not actual food photos
+    const relevantImages = data.items?.filter(item => {
       const link = item.link?.toLowerCase() || '';
       const title = item.title?.toLowerCase() || '';
       const snippet = item.snippet?.toLowerCase() || '';
+      const contextLink = item.image?.contextLink?.toLowerCase() || '';
       
-      // Prefer images from recipe/food content
-      const isRecipeImage = 
-        link.includes('recipe') ||
-        title.includes('recipe') ||
-        snippet.includes('recipe') ||
+      // Exclude common non-food image types
+      const isExcluded = 
+        link.includes('icon') ||
+        link.includes('logo') ||
+        link.includes('button') ||
+        link.includes('avatar') ||
+        link.includes('profile') ||
+        title.includes('icon') ||
+        title.includes('logo') ||
+        contextLink.includes('wikipedia') || // Often show ingredient photos instead of dishes
+        contextLink.includes('wiki');
+      
+      // Must have good dimensions
+      const hasGoodDimensions = 
+        item.image?.width >= 500 && 
+        item.image?.height >= 400;
+      
+      return !isExcluded && hasGoodDimensions;
+    }) || [];
+    
+    // Prioritize images that are from recipe sites or clearly show the dish
+    const bestImage = relevantImages.find(item => {
+      const link = item.link?.toLowerCase() || '';
+      const title = item.title?.toLowerCase() || '';
+      const snippet = item.snippet?.toLowerCase() || '';
+      const contextLink = item.image?.contextLink?.toLowerCase() || '';
+      
+      // Prefer images from known recipe sites
+      const isFromRecipeSite = 
+        contextLink.includes('recipe') ||
+        contextLink.includes('allrecipes') ||
+        contextLink.includes('foodnetwork') ||
+        contextLink.includes('bonappetit') ||
+        contextLink.includes('epicurious') ||
+        contextLink.includes('seriouseats') ||
+        contextLink.includes('food');
+      
+      // Prefer images that mention the dish name
+      const mentionsDish = 
         title.includes(cleanQuery.toLowerCase()) ||
         snippet.includes(cleanQuery.toLowerCase());
       
-      const hasGoodDimensions = 
-        item.image?.width >= 400 && 
-        item.image?.height >= 300;
-      
-      return isRecipeImage && hasGoodDimensions;
+      return (isFromRecipeSite || mentionsDish);
     });
     
     if (bestImage) {
-      console.log('✅ Found specific recipe image:', bestImage.title);
+      console.log('✅ Found high-quality recipe image from:', bestImage.image?.contextLink);
       return bestImage.link;
     }
     
-    // Fallback to first high-quality image
-    const fallbackImage = data.items?.find(item =>
-      item.image?.width >= 400 &&
-      item.image?.height >= 300
-    );
+    // Fallback to first relevant image with good dimensions
+    const fallbackImage = relevantImages[0];
+    
+    if (fallbackImage) {
+      console.log('✅ Using fallback image from:', fallbackImage.image?.contextLink);
+    }
     
     return fallbackImage?.link || null;
   } catch (error) {

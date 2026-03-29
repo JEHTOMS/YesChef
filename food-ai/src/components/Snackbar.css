@@ -1,0 +1,52 @@
+.snackbar {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #1E1E1E;
+    color: #fff;
+    padding: 12px 12px 12px 16px;
+    border-radius: 100px;
+    z-index: 10000;
+    min-width: 320px;
+    max-width: calc(100% - 32px);
+    animation: snackbarSlideUp 250ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes snackbarSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.snackbar-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.snackbar-content svg {
+    flex-shrink: 0;
+}
+
+.snackbar-undo {
+    background: #fff;
+    color: #1E1E1E;
+    border: none;
+    border-radius: 100px;
+    padding: 8px 20px;
+    cursor: pointer;
+    font-weight: 600;
+    flex-shrink: 0;
+}
