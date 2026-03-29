@@ -7,10 +7,12 @@
   <body>
     <script>
       // SPA redirect for GitHub Pages
-      // Stores the path and redirects to index.html, which restores it
-      var path = window.location.pathname + window.location.search + window.location.hash;
-      sessionStorage.setItem('spa-redirect', path);
-      window.location.replace('/');
+      // Encodes the path into a query param so index.html can restore it before React mounts
+      var path = window.location.pathname;
+      var search = window.location.search;
+      var hash = window.location.hash;
+      var redirectUrl = '/?spa-path=' + encodeURIComponent(path + search + hash);
+      window.location.replace(redirectUrl);
     </script>
     <noscript>
       This page redirects to the app index. Please enable JavaScript.
