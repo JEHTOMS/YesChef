@@ -3,15 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <title>Redirecting...</title>
-    <meta http-equiv="refresh" content="0; url=/index.html" />
   </head>
   <body>
     <script>
-      // Single Page Apps for GitHub Pages redirect script
-      // Simplified for custom domain hosting
-      (function(l) {
-        l.replace('/' + (l.search ? l.search + '&' : '?') + 'p=' + (l.pathname + l.search + l.hash).slice(1));
-      })(window.location);
+      // SPA redirect for GitHub Pages
+      // Stores the path and redirects to index.html, which restores it
+      var path = window.location.pathname + window.location.search + window.location.hash;
+      sessionStorage.setItem('spa-redirect', path);
+      window.location.replace('/');
     </script>
     <noscript>
       This page redirects to the app index. Please enable JavaScript.
