@@ -14,7 +14,7 @@ import { EmptyStateSignIn, EmptyStateNoRecipes } from '../NewUI/EmptyStates';
 
 function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp, dragProgress, skipTransition }) {
     const navigate = useNavigate();
-    const { savedRecipes, session, unsaveRecipe, loading, initialAuthChecked } = useSavedRecipes();
+    const { savedRecipes, session, unsaveRecipe, loading } = useSavedRecipes();
     const { openUnsaveConfirmModal } = useModal();
     const { setRecipeFromSaved } = useRecipe();
     
@@ -23,6 +23,11 @@ function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp
     const [swiperInstance, setSwiperInstance] = useState(null);
     const [isBeginning, setIsBeginning] = useState(true);
     const [isEnd, setIsEnd] = useState(false);
+    const [failedImages, setFailedImages] = useState(new Set());
+
+    const handleImageError = (recipeId) => {
+        setFailedImages(prev => new Set(prev).add(recipeId));
+    };
 
     // Calculate blur and opacity based on drag progress or final state
     const getTransitionStyles = (forCarousel) => {
@@ -171,8 +176,29 @@ function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp
         return `${minutes} min. cook time`;
     };
 
-    // Show loading state while auth is being checked or recipes are loading
-    if (!initialAuthChecked || (session && loading && savedRecipes.length === 0)) {
+    // Check if user is not logged in - show sign in empty state
+    if (!session) {
+        const expanded = !isCarouselModeProp;
+        return (
+            <div className="sv-wrapper" style={{ flex: expanded ? '1 0 auto' : '0 0 auto', gap: "0px", display: 'flex', flexDirection: 'column', paddingBottom: expanded ? '232px' : '0', transition: 'flex-grow 0.25s ease-out, padding-bottom 0.25s ease-out' }}>
+                <EmptyStateSignIn
+                    isExpanded={expanded}
+                    onSignInClick={() => {
+                    if (window.triggerSignIn) {
+                        window.triggerSignIn();
+                    }
+                }}
+                    onSignUpClick={() => {
+                    if (window.triggerSignUp) {
+                        window.triggerSignUp();
+                    }
+                }} />
+            </div>
+        );
+    }
+
+    // Show loading state while fetching recipes
+    if (session && loading && savedRecipes.length === 0) {
         return (
             <div className="sv-wrapper" style={{ height: 'auto', gap: "16px", display: 'flex', flexDirection: 'column' }}>
                 <div className="sv-header-wrapper" style={{ flexShrink: 0 }}>
@@ -191,20 +217,6 @@ function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp
                         }} />
                     </div>
                 </div>
-            </div>
-        );
-    }
-
-    // Check if user is not logged in - show sign in empty state
-    if (!session) {
-        return (
-            <div className="sv-wrapper" style={{ height: 'auto', gap: "0px", display: 'flex', flexDirection: 'column' }}>
-                <EmptyStateSignIn onSignInClick={() => {
-                    // Trigger sign-in from Home2 if available
-                    if (window.triggerSignIn) {
-                        window.triggerSignIn();
-                    }
-                }} />
             </div>
         );
     }
@@ -292,12 +304,12 @@ function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp
                                                 className="sv-recipe-item clickable"
                                                 onClick={() => handleRecipeClick(recipe)}
                                             >
-                                                <img 
-                                                    src={getRecipeImage(recipe)} 
-                                                    alt={recipe.recipe_title} 
-                                                    className="sv-recipe-image" 
+                                                <img
+                                                    src={failedImages.has(recipe.id) ? '/recipe-fallback.svg' : getRecipeImage(recipe)}
+                                                    alt={recipe.recipe_title}
+                                                    className="sv-recipe-image"
                                                     loading="eager"
-                                                    onError={(e) => { e.target.src = '/default-recipe.jpg'; }}
+                                                    onError={() => handleImageError(recipe.id)}
                                                 />
                                                 <div className="sv-recipe-info">
                                                     <h3 className="text-lg sv-recipe-name">{recipe.recipe_title}</h3>
@@ -351,12 +363,12 @@ function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp
                                         className="sv-recipe-item clickable"
                                         onClick={() => handleRecipeClick(recipe)}
                                     >
-                                        <img 
-                                            src={getRecipeImage(recipe)} 
-                                            alt={recipe.recipe_title} 
-                                            className="sv-recipe-image" 
+                                        <img
+                                            src={failedImages.has(recipe.id) ? '/recipe-fallback.svg' : getRecipeImage(recipe)}
+                                            alt={recipe.recipe_title}
+                                            className="sv-recipe-image"
                                             loading="eager"
-                                            onError={(e) => { e.target.src = '/default-recipe.jpg'; }}
+                                            onError={() => handleImageError(recipe.id)}
                                         />
                                         <div className="sv-recipe-info">
                                             <h3 className="text-lg sv-recipe-name">{recipe.recipe_title}</h3>

@@ -1,0 +1,66 @@
+/* Speech / "Your chef's voice" settings page */
+
+.speech-section {
+  display: flex;
+  padding: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  align-self: stretch;
+  border-radius: 32px;
+  background: #FFF;
+}
+
+.speech-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Custom radio buttons */
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  align-self: stretch;
+  padding: 6px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.radio-row input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.radio-custom {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 50%;
+  border: 2px solid #C4C4C4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease;
+}
+
+.radio-custom::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.radio-row input[type="radio"]:checked ~ .radio-custom {
+  border-color: #1E1E1E;
+}
+
+.radio-row input[type="radio"]:checked ~ .radio-custom::after {
+  background: #1E1E1E;
+}

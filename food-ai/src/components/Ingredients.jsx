@@ -21,9 +21,18 @@ const Ingredients = forwardRef(({ ingredients: initialIngredients, servingMultip
             const originalQuantity = parseQuantity(ingredient.quantity);
             
             // If we can parse a number, scale it; otherwise, keep original
-            const scaledQuantity = originalQuantity !== null 
-                ? (originalQuantity * servingMultiplier).toFixed(originalQuantity % 1 === 0 ? 0 : 1)
-                : ingredient.quantity;
+            let scaledQuantity;
+            if (originalQuantity !== null) {
+                const raw = originalQuantity * servingMultiplier;
+                const decimals = originalQuantity % 1 === 0 ? 0 : 1;
+                const rounded = parseFloat(raw.toFixed(decimals));
+                // Never let a nonzero quantity scale down to 0
+                scaledQuantity = (originalQuantity > 0 && rounded <= 0)
+                    ? raw.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+                    : rounded.toString();
+            } else {
+                scaledQuantity = ingredient.quantity;
+            }
             
             // For non-numeric quantities, we might want to add a note about scaling
             const needsManualScaling = originalQuantity === null && servingMultiplier !== 1;

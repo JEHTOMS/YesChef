@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { API_ENDPOINTS } from '../config.js';
 import '../pages/Home.css';
@@ -7,10 +7,13 @@ import '../index.css';
 import NewNavbar from "../NewUI/NewNavbar.jsx";
 import './Menu.css';
 import './Profile.css';
+import '../components/Shimmer.css';
 
 
 function Profile() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const isSetup = searchParams.get('setup') === '1';
     const [email, setEmail] = useState('');
     const [firstName, setFirstName] = useState('');
     const [emailUpdates, setEmailUpdates] = useState(false);
@@ -38,7 +41,9 @@ function Profile() {
                 
                 if (profile) {
                     setFirstName(profile.display_name || '');
-                    setEmailUpdates(profile.email_updates || false);
+                    // Use DB value, but fall back to localStorage flag for fresh signups
+                    const pendingUpdates = localStorage.getItem('pending_email_updates');
+                    setEmailUpdates(profile.email_updates || pendingUpdates === 'true');
                 }
             }
             setLoading(false);
@@ -80,7 +85,7 @@ function Profile() {
                 return;
             }
             // Sign out and redirect to home
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: 'local' });
             navigate('/');
         } catch (err) {
             setDeleteError('Something went wrong. Please try again.');
@@ -113,9 +118,11 @@ function Profile() {
         if (error) {
             setMessage(`Error: ${error.message}`);
         } else {
+            if (isSetup) {
+                navigate('/');
+                return;
+            }
             setMessage('Profile saved!');
-            // Navigate back after short delay
-            setTimeout(() => navigate(-1), 1000);
         }
         setSaving(false);
     };
@@ -126,7 +133,20 @@ function Profile() {
                 <NewNavbar showBackButton onBackClick={handleBack} />
                 <div className="main-content">
                     <div className="container layout-sm">
-                        <p>Loading...</p>
+                        <div className="shimmer-line" style={{ width: '120px', height: '32px', borderRadius: '8px', marginBottom: '16px' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div className="shimmer-line" style={{ width: '140px', height: '14px' }} />
+                                <div className="shimmer-line" style={{ width: '100%', height: '48px', borderRadius: '16px', maxWidth: '100%' }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div className="shimmer-line" style={{ width: '200px', height: '14px' }} />
+                                <div className="shimmer-line" style={{ width: '100%', height: '48px', borderRadius: '16px', maxWidth: '100%' }} />
+                            </div>
+                            <div className="shimmer-line" style={{ width: '240px', height: '14px' }} />
+                            <div className="shimmer-line" style={{ width: '130px', height: '42px', borderRadius: '200px', alignSelf: 'flex-end' }} />
+                        </div>
+                        <div className="shimmer-line" style={{ width: '100%', height: '48px', borderRadius: '16px', maxWidth: '100%', marginTop: '24px' }} />
                     </div>
                 </div>
             </div>
@@ -138,7 +158,7 @@ function Profile() {
              <NewNavbar 
             showBackButton
             onBackClick={handleBack}
-            onLogoClick={() => navigate('/home2')}
+            onLogoClick={() => navigate('/')}
             />
             <div className="main-content">   
             <div className="container layout-sm ">

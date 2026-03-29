@@ -199,9 +199,19 @@ width: 100%;
 
 .description{
    color: rgba(0, 0, 0, 0.55); 
-   padding: 4px 8px;
 }
 
+.dsc-wrapper{
+display: flex;
+padding: 4px 0px;
+align-items: center;
+gap: 4px;
+}
+.socials-svgs{
+  display: flex;
+align-items: center;
+gap: -0.1px;
+}
 .input-wrapper{
     display: flex;
     width: 100%;
@@ -268,6 +278,106 @@ background: #FFD5F6;
   display: none;
 }
 
+/* Shimmer Loading Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Home page shimmer skeleton */
+.home-skeleton {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.skeleton-input-wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 80px;
+}
+
+.skeleton-input-container {
+  display: flex;
+  padding: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  flex: 1 0 0;
+  align-self: stretch;
+  border-radius: 24px;
+  background: #FFF;
+}
+
+.skeleton-textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  border-radius: 12px;
+}
+
+.skeleton-input-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  align-self: stretch;
+}
+
+.skeleton-description {
+  width: 180px;
+  height: 20px;
+  border-radius: 10px;
+}
+
+.skeleton-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.skeleton-footer-description {
+  width: 280px;
+  height: 16px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* Mobile shimmer adjustments */
+@media (max-width: 640px) {
+  .skeleton-input-wrapper {
+    padding-bottom: 0;
+    padding-top: 196px;
+  }
+
+  .skeleton-input-container {
+    border-radius: 24px 24px 0px 0px;
+  }
+
+  .skeleton-description {
+    max-width: 150px;
+  }
+}
+
 @media (max-width: 640px) {
   .main-content {
     padding-left: 0;
@@ -281,7 +391,7 @@ background: #FFD5F6;
   /* Remove bottom padding from input-wrapper on mobile */
   .input-wrapper {
     padding-bottom: 0;
-    padding-top: 196px;
+    padding-top: 150px;
   }
   
   /* Change border-radius for sheet appearance */

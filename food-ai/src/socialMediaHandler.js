@@ -146,6 +146,8 @@ const fetchSocialMediaTranscript = async (videoUrl, lang = 'en') => {
 
     console.log(`✅ VidNavigator success: ${transcript.length} transcript segments`);
     console.log('Video Title:', video_info.title);
+    console.log('Video Thumbnail:', video_info.thumbnail);
+    console.log('Video Info keys:', Object.keys(video_info));
     
     // Transform to our internal subtitle format
     const subtitles = transcript.map(segment => ({

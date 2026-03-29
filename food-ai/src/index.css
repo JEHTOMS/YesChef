@@ -154,6 +154,20 @@ color:#000000;
 cursor: pointer;
 }
 
+.auth-divider{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.auth-divider::before,
+.auth-divider::after{
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E0E0E0;
+}
+
 .sm-button{
   display: flex;
 padding: 5px 12px 8px 12px;

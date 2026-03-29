@@ -34,6 +34,9 @@ function Input2({ onRecipeSubmit, onSubmit, isLoading, isCarouselMode = false, o
     return (
         <div className="input-container" style={isCarouselMode ? {transition: 'box-shadow 0.2s ease-out'} : {boxShadow: "-4px -4px 20px 0 rgba(58, 58, 58, 0.05), 4px 4px 20px 0 rgba(58, 58, 58, 0.05)", transition: 'box-shadow 0.2s ease-out'}}>
             <div className="sheet-grabber" onClick={onGrabberClick} style={{ cursor: 'pointer', touchAction: 'none' }}></div>
+            <div className='dsc-wrapper' style={{marginBottom: "-8px"}}><p className="description text-sm" style={{fontSize: "13px"}}>Create recipes from adding text or any social link.</p>
+            
+            </div>
             <textarea 
                 value={videoUrl}
                 onChange={handleInputChange}
@@ -46,7 +49,8 @@ function Input2({ onRecipeSubmit, onSubmit, isLoading, isCarouselMode = false, o
                 rows={2}
             />
             <div className="input-footer">
-            <p className="description text-sm">Create recipe from a social link or text</p>
+            <div className='dsc-wrapper'><a href="mailto:hello@yescheff.co" className="description text-sm" style={{fontSize: "13px", textDecoration: "underline"}}>Got feedback?</a>
+            </div>
             <button 
                 className="md-button text-lg"
                 onClick={() => {

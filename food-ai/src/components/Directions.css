@@ -38,7 +38,7 @@
 .steps{
     display: flex;
     width: 100%;
-    height: 55svh;
+    min-height: 55svh;
     flex-direction: column;
     align-items: flex-start;
     align-self: center;
@@ -138,16 +138,20 @@ background: rgba(58, 58, 58, 0.06);
 
 .timer{
    display: inline-block;
-   padding: 0px 4px 2px 4px;
+   padding: 0px 4px;
     border-radius: 6px;
     background: rgba(43, 196, 49, 0.15);
     color: #27992C;
     transition: background 120ms ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
 }
 
 .time{
     cursor: pointer;
 }
+
 
 /* Hover shows a slightly stronger green background */
 .timer:hover {

@@ -1128,7 +1128,7 @@ app.post('/api/recipes/save', async (req, res) => {
 
     const newRecipe = {
       user_id: userId,
-      recipe_title: recipe?.title || 'Untitled Recipe',
+      recipe_title: req.body.displayName || recipe?.title || 'Untitled Recipe',
       recipe_image: thumbnail,
       cook_time: recipe?.cookTime || null,
       servings: recipe?.servings || null,

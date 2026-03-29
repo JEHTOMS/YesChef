@@ -17,6 +17,7 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     pointer-events: auto;
+    animation: modalOverlayFadeIn 150ms ease-out;
 }
 
 .modal-container{
@@ -30,6 +31,23 @@ gap: 32px;
 border-radius: 32px;
 background: #F7F7F7;
     overflow: hidden;
+    animation: modalSlideUp 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalOverlayFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .modal-header{
@@ -71,6 +89,12 @@ border-radius: 24px;
 background: #FFF;
 }
 
+.modal-header-minimal {
+    border-bottom: none;
+    justify-content: flex-end;
+    padding: 16px 16px 16px 16px;
+}
+
 /* Unsave Confirm Modal Styles */
 .unsave-confirm-container {
     display: flex;
@@ -83,6 +107,7 @@ background: #FFF;
     border-radius: 32px;
     background: #FFF;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+    animation: modalSlideUp 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .unsave-confirm-content {
@@ -103,20 +128,25 @@ background: #FFF;
     display: flex;
     flex-direction: column;
     gap: 8px;
+   
 }
 
 .unsave-text h3 {
     margin: 0;
+     text-align: center;
 }
 
 .unsave-text p {
     margin: 0;
     line-height: 1.5;
+    text-align: center;
+    font-size: 16px;
 }
 
 .unsave-actions {
     display: flex;
     gap: 12px;
+    padding-top: 16px;
     width: 100%;
 }
 
@@ -129,8 +159,14 @@ background: #FFF;
 
 .cancel-btn {
     background: #F3F3F3;
+    display: flex;
+    justify-content: center;
 }
+
 
 .unsave-btn {
     background: #F04DCC;
+    display: flex;
+    justify-content: center;
+
 }

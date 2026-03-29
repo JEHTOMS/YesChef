@@ -29,6 +29,7 @@ import Steps from './components/Steps.jsx';
 import Stores from './components/Stores.jsx';
 import ToNote from './components/ToNote.jsx';
 import EmptyState from './NewUI/EmptyStates.jsx';
+import Shimmer from './components/Shimmer.jsx';
 
 // ============================================
 // COMPONENT ISOLATION MODE
@@ -68,6 +69,8 @@ const COMPONENT_MAP = {
   Stores,
   ToNote,
   EmptyState
+  ,
+  Shimmer
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

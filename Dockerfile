@@ -18,10 +18,16 @@ RUN npm run build
 FROM node:18-alpine AS production
 WORKDIR /app
 
+# Install Python for youtube-transcript-api (most reliable transcript extraction)
+RUN apk add --no-cache python3 py3-pip curl
+COPY requirements.txt ./
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
 # Copy backend dependencies and source
 COPY --from=base /app/node_modules ./node_modules
 COPY food-ai/package*.json ./
 COPY food-ai/server-clean.mjs ./
+COPY food-ai/transcript_fetcher.py ./
 COPY food-ai/src ./src
 
 # Copy built frontend

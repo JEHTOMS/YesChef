@@ -16,6 +16,7 @@ function NewNavbar({
     // Right side props
     showCreditsButton = false,
     credits = 0,
+    isPro = false,
     showProfileButton = false,
     profileInitial = '',
     showAuthButtons = false,
@@ -118,7 +119,7 @@ function NewNavbar({
                                     strokeWidth="2"
                                 />
                             </svg>
-                            {!creditsButtonClicked && <span>{credits} cr.</span>}
+                            {!creditsButtonClicked && <span>{isPro ? 'Save' : `${credits} cr.`}</span>}
                         </button>
                     )}
                     

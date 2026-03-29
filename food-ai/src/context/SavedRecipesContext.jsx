@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { API_ENDPOINTS } from '../config';
 
 const SavedRecipesContext = createContext();
 
@@ -13,17 +14,36 @@ export const useSavedRecipes = () => {
 
 export const SavedRecipesProvider = ({ children }) => {
     const [savedRecipes, setSavedRecipes] = useState([]);
-    const [loading, setLoading] = useState(true); // Start as true until first fetch completes
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [version, setVersion] = useState(0); // Version counter for auto-refresh
     const [session, setSession] = useState(null);
-    const [initialAuthChecked, setInitialAuthChecked] = useState(false);
+
+    // Snackbar state for undo after unsave
+    const [snackbar, setSnackbar] = useState(null); // { message, undoData, buttonText, action }
+    const snackbarTimerRef = useRef(null);
+
+    const dismissSnackbar = useCallback(() => {
+        if (snackbarTimerRef.current) {
+            clearTimeout(snackbarTimerRef.current);
+            snackbarTimerRef.current = null;
+        }
+        setSnackbar(null);
+    }, []);
+
+    const showSnackbar = useCallback((message, undoData, { buttonText, action } = {}) => {
+        dismissSnackbar();
+        setSnackbar({ message, undoData, buttonText, action });
+        snackbarTimerRef.current = setTimeout(() => {
+            setSnackbar(null);
+            snackbarTimerRef.current = null;
+        }, 4000);
+    }, [dismissSnackbar]);
 
     // Listen for auth changes
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
-            setInitialAuthChecked(true);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -69,51 +89,43 @@ export const SavedRecipesProvider = ({ children }) => {
         fetchSavedRecipes();
     }, [fetchSavedRecipes, version]);
 
-    // Save a recipe
-    const saveRecipe = async (recipeData, originalQuery) => {
+    // Save a recipe via backend (handles credit deduction server-side)
+    const saveRecipe = async (recipeData, originalQuery, displayName) => {
         if (!session?.user?.id) {
             throw new Error('Must be logged in to save recipes');
         }
 
-        const recipe = recipeData?.recipe || recipeData;
-        const videoId = recipeData?.videoId;
-        const thumbnail = recipeData?.thumbnail;
-        
-        // Priority: social media thumbnail → YouTube thumbnail → Google image → null
-        const thumbnailUrl = thumbnail || 
-            (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null) || 
-            recipe?.image || 
-            null;
-
-        const newRecipe = {
-            user_id: session.user.id,
-            recipe_title: recipe?.title || 'Untitled Recipe',
-            recipe_image: thumbnailUrl,
-            cook_time: recipe?.cookTime || null,
-            servings: recipe?.servings || null,
-            recipe_data: recipeData, // Store full recipe data for later retrieval
-            video_id: videoId || null,
-            original_url: originalQuery || null,
-        };
-
         try {
-            const { data, error: insertError } = await supabase
-                .from('saved_recipes')
-                .insert(newRecipe)
-                .select()
-                .single();
+            const response = await fetch(API_ENDPOINTS.RECIPE_SAVE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: session.user.id,
+                    recipeData,
+                    originalQuery,
+                    displayName,
+                }),
+            });
 
-            if (insertError) {
-                // Check for duplicate error
-                if (insertError.code === '23505') {
+            const result = await response.json();
+
+            if (!response.ok) {
+                if (result.needsUpgrade) {
+                    const err = new Error('INSUFFICIENT_CREDITS');
+                    err.creditsRequired = result.creditsRequired;
+                    err.currentCredits = result.credits;
+                    throw err;
+                }
+                if (result.error === 'Recipe already saved') {
                     throw new Error('Recipe already saved');
                 }
-                throw insertError;
+                throw new Error(result.error || 'Failed to save recipe');
             }
 
             // Increment version to trigger refresh
             setVersion(v => v + 1);
-            return data;
+            showSnackbar('Added to saved recipes', null, { buttonText: 'View all', action: 'viewSaved' });
+            return result.recipe;
         } catch (err) {
             console.error('Error saving recipe:', err);
             throw err;
@@ -126,6 +138,9 @@ export const SavedRecipesProvider = ({ children }) => {
             throw new Error('Must be logged in to unsave recipes');
         }
 
+        // Grab the full row before deleting so we can undo
+        const deletedRecipe = savedRecipes.find(r => r.id === recipeId);
+
         try {
             const { error: deleteError } = await supabase
                 .from('saved_recipes')
@@ -137,11 +152,44 @@ export const SavedRecipesProvider = ({ children }) => {
 
             // Increment version to trigger refresh
             setVersion(v => v + 1);
+
+            // Show snackbar with undo
+            if (deletedRecipe) {
+                showSnackbar('Recipe unsaved', deletedRecipe);
+            }
         } catch (err) {
             console.error('Error unsaving recipe:', err);
             throw err;
         }
     };
+
+    // Undo unsave — re-insert the deleted row
+    const undoUnsave = useCallback(async () => {
+        if (!snackbar?.undoData) return;
+        const row = snackbar.undoData;
+        dismissSnackbar();
+
+        try {
+            // Re-insert with the original columns (omit id so Supabase generates a new one)
+            const { error: insertError } = await supabase
+                .from('saved_recipes')
+                .insert({
+                    user_id: row.user_id,
+                    recipe_title: row.recipe_title,
+                    recipe_image: row.recipe_image,
+                    cook_time: row.cook_time,
+                    servings: row.servings,
+                    recipe_data: row.recipe_data,
+                    video_id: row.video_id,
+                    original_url: row.original_url,
+                });
+
+            if (insertError) throw insertError;
+            setVersion(v => v + 1);
+        } catch (err) {
+            console.error('Error undoing unsave:', err);
+        }
+    }, [snackbar, dismissSnackbar]);
 
     // Check if a recipe is already saved (by video_id or recipe_title)
     const isRecipeSaved = useCallback((recipeData) => {
@@ -187,12 +235,14 @@ export const SavedRecipesProvider = ({ children }) => {
         loading,
         error,
         session,
-        initialAuthChecked,
         saveRecipe,
         unsaveRecipe,
         isRecipeSaved,
         getSavedRecipeId,
         refreshSavedRecipes,
+        snackbar,
+        dismissSnackbar,
+        undoUnsave,
     };
 
     return (

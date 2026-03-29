@@ -6,16 +6,19 @@ import { useUser } from '../context/UserContext';
 import '../pages/Home.css';
 import '../index.css';
 import Input2 from "../NewUI/Input2.jsx";
-import SavedRecipes from "../components/SavedRecipes.jsx"; 
+import SavedRecipes from "../components/SavedRecipes.jsx";
+import { useSavedRecipes } from '../context/SavedRecipesContext';
 import NewNavbar from "../NewUI/NewNavbar.jsx";
 import Modal from "./Modal.jsx";
 import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorOverlay from "../components/ErrorOverlay";
+import Shimmer from "../components/Shimmer";
 
 function Home2() {
     const navigate = useNavigate();
     const { recipeData, searchRecipe, loading, error, clearError, cancelRecipeExtraction } = useRecipe();
-    const { session, displayName, getProfileInitial, loading: userLoading } = useUser();
+    const { session, getProfileInitial, loading: userLoading } = useUser();
+    const { loading: savedRecipesLoading } = useSavedRecipes();
     const [query, setQuery] = useState('');
     const [isCarouselMode, setIsCarouselMode] = useState(true);
     const [skipTransition, setSkipTransition] = useState(false);
@@ -29,6 +32,9 @@ function Home2() {
     const [dragHeight, setDragHeight] = useState(null);
     const [dragProgress, setDragProgress] = useState(null); // 0 = collapsed, 1 = expanded
 
+    // Show shimmer while user context or saved recipes are loading
+    const isPageLoading = userLoading || savedRecipesLoading;
+
     const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
     // Check if user has completed profile setup
@@ -41,7 +47,7 @@ function Home2() {
         
         // If no profile or no display_name set, redirect to profile page
         if (!profile || !profile.display_name) {
-            navigate('/profile');
+            navigate('/profile?setup=1');
         }
     };
 
@@ -50,19 +56,34 @@ function Home2() {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session) {
                 setIsModalOpen(false); // Close modal on successful login
-                // Check if new user needs to complete profile
                 if (_event === 'SIGNED_IN') {
-                    checkProfileAndRedirect(session.user.id);
+                    // Check if we need to return to a specific page after OAuth
+                    const returnPath = localStorage.getItem('yeschef_auth_return');
+                    if (returnPath) {
+                        localStorage.removeItem('yeschef_auth_return');
+                        navigate(returnPath);
+                        return;
+                    }
+                    // Only redirect to profile setup for brand new users
+                    const createdAt = new Date(session.user.created_at);
+                    const now = new Date();
+                    const isNewUser = (now - createdAt) < 60000; // created within last 60 seconds
+                    if (isNewUser) {
+                        checkProfileAndRedirect(session.user.id);
+                    }
                 }
             }
         });
 
         return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Redirect to food-overview if recipe data exists
+    // But NOT if we're processing an auth callback (code= or access_token in URL)
     useEffect(() => {
-        if (recipeData && !loading && !error) {
+        const isAuthCallback = window.location.search.includes('code=') || window.location.hash.includes('access_token');
+        if (recipeData && !loading && !error && !isAuthCallback) {
             navigate("/food-overview");
         }
     }, [recipeData, loading, error, navigate]);
@@ -73,11 +94,13 @@ function Home2() {
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
 
-        // Expose sign-in trigger globally for SavedRecipes
+        // Expose auth triggers globally for SavedRecipes
         window.triggerSignIn = openSignInModal;
+        window.triggerSignUp = openSignUpModal;
 
         return () => {
             delete window.triggerSignIn;
+            delete window.triggerSignUp;
         };
     }, []);
 
@@ -138,11 +161,13 @@ function Home2() {
     const handleAuth = async (email, isSignUp = false) => {
         setAuthLoading(true);
         setAuthMessage(null);
+
+        const emailRedirectTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
         
         const { error } = await supabase.auth.signInWithOtp({
             email: email,
             options: {
-                emailRedirectTo: `${window.location.origin}/`,
+                emailRedirectTo,
                 shouldCreateUser: isSignUp, // Only create new users on sign up
             }
         });
@@ -161,9 +186,12 @@ function Home2() {
         setAuthLoading(false);
     };
 
-    // Sign out handler
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
+    const handleGoogleAuth = async () => {
+        const redirectTo = `${window.location.origin}`;
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo }
+        });
     };
 
     // Modal content based on type
@@ -177,6 +205,12 @@ function Home2() {
                         <form onSubmit={(e) => {
                             e.preventDefault();
                             const email = e.target.email.value;
+                            const wantsUpdates = e.target['email-updates'].checked;
+                            if (wantsUpdates) {
+                                localStorage.setItem('pending_email_updates', 'true');
+                            } else {
+                                localStorage.removeItem('pending_email_updates');
+                            }
                             handleAuth(email, true);
                         }} className="form">
                             <div className="form-input">
@@ -196,6 +230,11 @@ function Home2() {
                             <div className="form-footer" style={{alignItems: "center"}}>
                                 <p className="footer-text">By continuing, you agree to our <span><a href="/terms-of-service" style={{textDecoration:"underline"}}>Terms of Service</a></span> and <span><a href="/privacy-policy" style={{textDecoration:"underline"}}>Privacy Policy</a></span>.</p>
                                 <input className="pri-button text-lg" id="sign-up-button" type="submit" value={authLoading ? "Sending..." : "Sign up"} disabled={authLoading} />
+                                <div className="auth-divider"><span className="text-sm content-sec-color">or</span></div>
+                                <button type="button" className="sec-button text-lg" onClick={handleGoogleAuth} style={{width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer"}}>
+                                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                                    Continue with Google
+                                </button>
                                 <p className="text-lg">Already have an account? <span><button type="button" onClick={(e) => { e.preventDefault(); openSignInModal(); }} style={{textDecoration:"underline", color: "#F04DCC", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit"}}>Sign In</button></span></p>
                             </div>
                          </form>
@@ -224,6 +263,11 @@ function Home2() {
                             )}
                             <div className="form-footer" style={{alignItems: "center"}}>
                                 <input className="pri-button text-lg" id="sign-in-button" type="submit" value={authLoading ? "Sending..." : "Send Login link"} disabled={authLoading} />
+                                <div className="auth-divider"><span className="text-sm content-sec-color">or</span></div>
+                                <button type="button" className="sec-button text-lg" onClick={handleGoogleAuth} style={{width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer"}}>
+                                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                                    Continue with Google
+                                </button>
                             </div>
                          </form>
                     </div>
@@ -291,17 +335,14 @@ function Home2() {
             return;
         }
         
-        const threshold = 60;
-        const baseHeight = dragState.current.baseHeight;
-        const finalHeight = dragHeight ?? baseHeight;
-        
-        // Determine new mode based on drag
-        let newMode = isCarouselMode; // default: keep current
-        if (finalHeight >= baseHeight + threshold) {
-            newMode = true; // carousel mode
-        } else if (finalHeight <= baseHeight - threshold) {
-            newMode = false; // list mode
-        }
+        const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const minHeight = 140;
+        const maxHeight = viewportHeight * 0.92;
+        const midpoint = (minHeight + maxHeight) / 2;
+        const finalHeight = dragHeight ?? dragState.current.baseHeight;
+
+        // Snap to whichever state the sheet is closest to — fully reversible mid-drag
+        const newMode = finalHeight >= midpoint;
         
         // Set the final dragProgress to match the target state BEFORE clearing
         // This prevents flicker by ensuring search input stays in correct state
@@ -345,12 +386,13 @@ function Home2() {
         }
         
         // Mobile: sheet behavior with pointer-events pass-through
-        const base = { 
-            position: 'absolute', 
-            bottom: 0, 
-            left: 0, 
+        const base = {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
             right: 0,
-            pointerEvents: 'none' // Allow touch through to SavedRecipes underneath
+            pointerEvents: 'none', // Allow touch through to SavedRecipes underneath
+            ...(session?.user ? { paddingTop: '182px' } : {})
         };
 
         if (dragHeight !== null) {
@@ -371,45 +413,49 @@ function Home2() {
 
     return (
         <div className="page home-page" style={{ paddingBottom: '0px' }}>
-             <NewNavbar 
+             <NewNavbar
             showLogo
             showAuthButtons={!userLoading && !session?.user}
             showProfileButton={!userLoading && !!session?.user}
             profileInitial={getProfileInitial()}
-            onLogoClick={() => navigate('/home2')}
+            onLogoClick={() => navigate('/')}
             onSignUp={openSignUpModal}
             onSignIn={openSignInModal}
-            onProfileClick={() => navigate('/menu')}
+            onProfileClick={() => navigate('/menu', { state: { from: '/' } })}
             />
-            <div className="main-content" style={{ height: '100%', overflow: 'hidden' }}>
-                 <div className="container layout-sm" style={{ height: '100%', maxHeight: '100svh', position: 'relative' }}>
-                     <SavedRecipes onCarouselModeChange={handleCarouselModeChange} isCarouselMode={isCarouselMode} dragProgress={dragProgress} skipTransition={skipTransition} />
-                    <div
-                        ref={wrapperRef}
-                        className="input-wrapper"
-                        style={inputWrapperStyle}
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                    >
-                        <Input2 
-                            onRecipeSubmit={handleVideoSubmit} 
-                            onSubmit={handleExtractRecipe}
-                            isLoading={loading}
-                            isCarouselMode={isCarouselMode}
-                            onGrabberClick={handleGrabberClick}
-                        />
+            {isPageLoading ? (
+                <Shimmer />
+            ) : (
+                <div className="main-content" style={{ height: '100%', overflow: 'hidden' }}>
+                    <div className="container layout-sm" style={{ height: '100%', maxHeight: '100svh', position: 'relative' }}>
+                        <SavedRecipes onCarouselModeChange={handleCarouselModeChange} isCarouselMode={isCarouselMode} dragProgress={dragProgress} skipTransition={skipTransition} />
+                        <div
+                            ref={wrapperRef}
+                            className="input-wrapper"
+                            style={inputWrapperStyle}
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                        >
+                            <Input2
+                                onRecipeSubmit={handleVideoSubmit}
+                                onSubmit={handleExtractRecipe}
+                                isLoading={loading}
+                                isCarouselMode={isCarouselMode}
+                                onGrabberClick={handleGrabberClick}
+                            />
 
-                        <Modal 
-                        title={getModalConfig().title} 
-                        subtitle={getModalConfig().subtitle}
-                        isOpen={isModalOpen}
-                        onClose={closeModal}
-                        content={getModalConfig().content}
-                        />
+                            <Modal
+                            title={getModalConfig().title}
+                            subtitle={getModalConfig().subtitle}
+                            isOpen={isModalOpen}
+                            onClose={closeModal}
+                            content={getModalConfig().content}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
             
             {loading && (
                 <LoadingOverlay 

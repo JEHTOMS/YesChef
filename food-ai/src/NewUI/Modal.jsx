@@ -59,10 +59,12 @@ function Modal({ title, subtitle, content, isOpen, onClose }){
     return(
         <div className="modal-overlay" onClick={handleOverlayClick}>
             <div className="modal-container">
-                <div className="modal-header">
+                <div className={`modal-header ${!title && !subtitle ? 'modal-header-minimal' : ''}`}>
+                    {(title || subtitle) && (
                     <div className="modal-header-text"><div className="modal-title text-subtitle">{title}</div>
                     <p className="modal-subtitle text-sm content-sec-color">{subtitle}</p>
                     </div>
+                    )}
                     <button className="icon-button" id="close-modal" onClick={onClose}><svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M20.75 7.25L7.25 20.75M7.25 7.25L20.75 20.75" stroke="#1E1E1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
