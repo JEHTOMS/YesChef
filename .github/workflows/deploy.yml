@@ -65,6 +65,8 @@ jobs:
       working-directory: ./food-ai
       run: |
         echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" >> .env.production
+        echo "REACT_APP_SUPABASE_URL=${{ secrets.REACT_APP_SUPABASE_URL }}" >> .env.production
+        echo "REACT_APP_SUPABASE_ANON_KEY=${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}" >> .env.production
         echo "REACT_APP_GA_MEASUREMENT_ID=${{ secrets.REACT_APP_GA_MEASUREMENT_ID }}" >> .env.production
         echo "GENERATE_SOURCEMAP=false" >> .env.production
     
