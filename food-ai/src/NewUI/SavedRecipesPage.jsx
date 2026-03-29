@@ -50,7 +50,7 @@ function SavedRecipesPage() {
 
     const getRecipeImage = (recipe) => {
         if (recipe.recipe_image) return recipe.recipe_image;
-        return '/default-recipe.jpg';
+        return '/recipe-fallback.svg';
     };
 
     const formatCookTime = (cookTime) => {

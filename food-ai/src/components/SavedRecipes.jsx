@@ -159,7 +159,7 @@ function SavedRecipes({ onCarouselModeChange, isCarouselMode: isCarouselModeProp
     const getRecipeImage = (recipe) => {
         if (recipe.recipe_image) return recipe.recipe_image;
         // Return a default placeholder
-        return '/default-recipe.jpg';
+        return '/recipe-fallback.svg';
     };
 
     const formatCookTime = (cookTime) => {

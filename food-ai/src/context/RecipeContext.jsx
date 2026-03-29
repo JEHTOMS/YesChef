@@ -380,6 +380,15 @@ export const RecipeProvider = ({ children }) => {
         }
     };
 
+    // Load a saved recipe directly into context
+    const setRecipeFromSaved = (savedRecipeData, savedOriginalUrl) => {
+        setRecipeData(savedRecipeData);
+        setOriginalQuery(savedOriginalUrl || '');
+        setSubtitleData(null);
+        setError(null);
+        setCurrentServings(savedRecipeData?.recipe?.servings || 1);
+    };
+
     const value = {
         recipeData,
         subtitleData,
@@ -396,6 +405,7 @@ export const RecipeProvider = ({ children }) => {
         currentServings,
         setCurrentServings,
         getServingMultiplier,
+        setRecipeFromSaved,
     };
 
     return (
