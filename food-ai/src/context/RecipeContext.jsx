@@ -159,7 +159,7 @@ export const RecipeProvider = ({ children }) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...(isLikelyYoutube(query) ? { videoInput: query } : { recipeName: query }),
+                    ...(isVideoUrl(query) ? { videoInput: query } : { recipeName: query }),
                     lang: 'en'
                 }),
                 signal: controller.signal,
@@ -242,6 +242,14 @@ export const RecipeProvider = ({ children }) => {
         const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/ |\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
         const id11 = /^[a-zA-Z0-9_-]{11}$/;
         return ytRegex.test(trimmed) || id11.test(trimmed);
+    };
+
+    const isVideoUrl = (val) => {
+        if (!val) return false;
+        const trimmed = String(val).trim().toLowerCase();
+        if (isLikelyYoutube(val)) return true;
+        const socialPlatforms = ['instagram.com', 'instagr.am', 'tiktok.com', 'facebook.com', 'fb.watch', 'fb.com', 'twitter.com', 'x.com', 'vimeo.com', 'dailymotion.com'];
+        return socialPlatforms.some(p => trimmed.includes(p));
     };
 
     const clearRecipe = () => {
