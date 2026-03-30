@@ -305,57 +305,6 @@ export const RecipeProvider = ({ children }) => {
         setError(null);
     };
 
-    // Extract food name from URL paths for display purposes
-    const extractFoodNameFromUrl = (url) => {
-        if (!url || typeof url !== 'string') return '';
-        
-        try {
-            const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
-            const pathname = urlObj.pathname;
-            
-            // Split path into segments and find meaningful food-related parts
-            const segments = pathname.split('/').filter(Boolean);
-            
-            // Common URL segments to ignore
-            const ignoreSegments = new Set([
-                'recipe', 'recipes', 'food', 'cooking', 'kitchen', 
-                'dish', 'dishes', 'article', 'post', 'blog',
-                'watch', 'v', 'embed', 'video', 'videos'
-            ]);
-            
-            // Find the most meaningful segment (usually the recipe name)
-            let foodName = '';
-            for (const segment of segments) {
-                const cleaned = decodeURIComponent(segment)
-                    .replace(/[-_]/g, ' ')
-                    .replace(/\d+/g, '') // remove numbers
-                    .trim()
-                    .toLowerCase();
-                
-                // Skip if it's an ignored segment or too short
-                if (ignoreSegments.has(cleaned) || cleaned.length < 3) continue;
-                
-                // If this looks like a food name (has letters), use it
-                if (/[a-z]/.test(cleaned) && cleaned.length > foodName.length) {
-                    foodName = cleaned;
-                }
-            }
-            
-            // Clean up and format the food name
-            if (foodName) {
-                return foodName
-                    .split(' ')
-                    .filter(word => word.length > 0)
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ');
-            }
-            
-            return '';
-        } catch (error) {
-            return '';
-        }
-    };
-
     // Helper function to get the best display name for the recipe
     const getDisplayName = () => {
         if (!recipeData) return '';
