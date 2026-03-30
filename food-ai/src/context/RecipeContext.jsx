@@ -359,33 +359,24 @@ export const RecipeProvider = ({ children }) => {
     // Helper function to get the best display name for the recipe
     const getDisplayName = () => {
         if (!recipeData) return '';
-        
-        const isYouTubeInput = isLikelyYoutube(originalQuery);
-        
-        if (isYouTubeInput) {
-            // For YouTube links, prioritize the recipe name extracted from the video content
+
+        const isUrl = originalQuery.includes('://') || originalQuery.includes('www.');
+
+        if (isUrl) {
+            // For any video URL (YouTube, Instagram, TikTok, etc.), use the extracted recipe title
             return recipeData.recipe?.title || recipeData.videoTitle || 'Unknown Recipe';
-        } else {
-            // Check if original query is a URL
-            const isUrl = originalQuery.includes('://') || originalQuery.includes('www.');
-            
-            if (isUrl) {
-                // Extract food name from URL first, fallback to recipe title
-                const urlFoodName = extractFoodNameFromUrl(originalQuery);
-                if (urlFoodName) return urlFoodName;
-            }
-            
-            // For text input, use the original query if it's more descriptive, fallback to recipe title
-            const userInput = originalQuery.trim();
-            const extractedTitle = recipeData.recipe?.title;
-            
-            // If user input is specific and reasonable length, prefer it
-            if (userInput && userInput.length > 2 && userInput.length < 100) {
-                return userInput;
-            }
-            
-            return extractedTitle || userInput || 'Unknown Recipe';
         }
+
+        // For text input, use the original query if it's more descriptive, fallback to recipe title
+        const userInput = originalQuery.trim();
+        const extractedTitle = recipeData.recipe?.title;
+
+        // If user input is specific and reasonable length, prefer it
+        if (userInput && userInput.length > 2 && userInput.length < 100) {
+            return userInput;
+        }
+
+        return extractedTitle || userInput || 'Unknown Recipe';
     };
 
     // Load a saved recipe directly into context
