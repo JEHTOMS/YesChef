@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import '../pages/Home.css';
 import '../index.css';
-import './Nav.css'; 
+import './Nav.css';
 
 function NewNavbar({
     // Left side props
     showLogo = false,
     showBackButton = false,
     showCloseButton = false,
-    
+
     // Center props
     showFoodName = false,
     foodName = '',
-    
+
     // Right side props
     showCreditsButton = false,
     credits = 0,
@@ -21,12 +21,13 @@ function NewNavbar({
     profileInitial = '',
     showAuthButtons = false,
     showCloseButtonRight = false,
-    
+
     // Save recipe props
     isRecipeSaved = false,
     onSaveRecipe,
     onUnsaveRecipe,
-    
+    isSaving = false,
+
     // Event handlers
     onLogoClick,
     onBackClick,
@@ -37,30 +38,11 @@ function NewNavbar({
     onSignUp,
     onCloseRightClick,
 }) {
-    const [creditsButtonClicked, setCreditsButtonClicked] = useState(isRecipeSaved);
-
-    // Sync with external isRecipeSaved prop
-    useEffect(() => {
-        setCreditsButtonClicked(isRecipeSaved);
-    }, [isRecipeSaved]);
-
     const handleCreditsClick = () => {
-        if (creditsButtonClicked) {
-            // Recipe is already saved, trigger unsave confirmation
-            if (onUnsaveRecipe) {
-                onUnsaveRecipe();
-            }
-        } else {
-            // Recipe is not saved, save it
-            setCreditsButtonClicked(true);
-            if (onSaveRecipe) {
-                onSaveRecipe();
-            }
-        }
-        // Also call general onCreditsClick if provided
-        if (onCreditsClick) {
-            onCreditsClick();
-        }
+        if (isSaving) return;
+        if (isRecipeSaved) onUnsaveRecipe?.();
+        else onSaveRecipe?.();
+        onCreditsClick?.();
     };
     // Logo SVG component
     const LogoSVG = () => (
@@ -71,7 +53,7 @@ function NewNavbar({
     );
 
     return (
-        <div className="nav-bar">
+        <div className={`nav-bar${showCreditsButton ? ' recipe-nav' : ''}`}>
             <div className="nav-container">
                 {/* Left Section */}
                 <div className="nav-left">
@@ -80,7 +62,7 @@ function NewNavbar({
                             <LogoSVG />
                         </div>
                     )}
-                    
+
                     {showBackButton && (
                         <button className="back-button icon-button" onClick={onBackClick} style={{position: 'static'}}>
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -88,7 +70,7 @@ function NewNavbar({
                             </svg>
                         </button>
                     )}
-                    
+
                     {showCloseButton && (
                         <button className="close-button icon-button" onClick={onCloseClick}>
                             <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -108,38 +90,44 @@ function NewNavbar({
                 {/* Right Section */}
                 <div className="nav-right">
                     {showCreditsButton && (
-                        <button 
-                            className={`credits-button md2-button-pri text-lg ${creditsButtonClicked ? 'clicked' : ''}`}
+                        <button
+                            className={`credits-button md2-button-pri text-lg ${isRecipeSaved ? 'clicked' : ''}`}
                             onClick={handleCreditsClick}
+                            disabled={isSaving}
+                            aria-busy={isSaving}
+                            aria-label={isSaving ? 'Saving recipe' : isRecipeSaved ? 'Unsave recipe' : 'Save recipe'}
+                            title={!isPro && !showAuthButtons && !isRecipeSaved ? `Save recipe for ${credits} credits` : undefined}
                         >
                             <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M11.084 6.2207C11.2938 6.7433 11.779 7.10403 12.3398 7.15527L16.9766 7.5791L13.415 10.8301C13.0193 11.1913 12.847 11.7364 12.9619 12.2598L14.0088 17.0254L10.1299 14.5635L10.0371 14.5088C9.59351 14.2699 9.05884 14.2699 8.61523 14.5088L8.52246 14.5635L4.64258 17.0254L5.69043 12.2598C5.80536 11.7364 5.63307 11.1913 5.2373 10.8301L1.6748 7.5791L6.3125 7.15527C6.87331 7.10403 7.35853 6.7433 7.56836 6.2207L9.32617 1.8418L11.084 6.2207Z" 
-                                    stroke={creditsButtonClicked ? "none" : "white"} 
-                                    fill={creditsButtonClicked ? "#fff" : "none"} 
+                                <path d="M11.084 6.2207C11.2938 6.7433 11.779 7.10403 12.3398 7.15527L16.9766 7.5791L13.415 10.8301C13.0193 11.1913 12.847 11.7364 12.9619 12.2598L14.0088 17.0254L10.1299 14.5635L10.0371 14.5088C9.59351 14.2699 9.05884 14.2699 8.61523 14.5088L8.52246 14.5635L4.64258 17.0254L5.69043 12.2598C5.80536 11.7364 5.63307 11.1913 5.2373 10.8301L1.6748 7.5791L6.3125 7.15527C6.87331 7.10403 7.35853 6.7433 7.56836 6.2207L9.32617 1.8418L11.084 6.2207Z"
+                                    stroke={isRecipeSaved ? "none" : "white"}
+                                    fill={isRecipeSaved ? "#fff" : "none"}
                                     strokeWidth="2"
                                 />
                             </svg>
-                            {!creditsButtonClicked && <span>{isPro ? 'Save' : `${credits} cr.`}</span>}
+                            {!isRecipeSaved && <span>{isSaving ? 'Saving…' : showAuthButtons || isPro ? 'Save recipe' : `Save · ${credits} cr.`}</span>}
                         </button>
                     )}
-                    
+
                     {showProfileButton && (
                         <button className="profile-button" onClick={onProfileClick}>
                             <div className="profile-initial text-lg">{profileInitial}</div>
                         </button>
                     )}
-                    
+
                     {showAuthButtons && !showProfileButton && (
-                        <div className="auth-buttons">
+                        <div className={`auth-buttons${showCreditsButton ? ' recipe-auth-buttons' : ''}`}>
                             <button className="sign-in md2-button-sec text-lg" onClick={onSignIn}>
                                 Sign in
                             </button>
-                            <button className="sign-up md2-button-pri text-lg" onClick={onSignUp}>
-                                Sign up
-                            </button>
+                            {!showCreditsButton && (
+                                <button className="sign-up md2-button-pri text-lg" onClick={onSignUp}>
+                                    Sign up
+                                </button>
+                            )}
                         </div>
                     )}
-                    
+
                     {showCloseButtonRight && (
                         <button className="close-button-right icon-button" onClick={onCloseRightClick}>
                             <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -151,6 +139,6 @@ function NewNavbar({
             </div>
         </div>
     );
-}   
+}
 
 export default NewNavbar;

@@ -1,3 +1,4 @@
+import { readPendingRecipeSave } from '../lib/pendingRecipeSave';
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
@@ -15,6 +16,7 @@ import ErrorOverlay from "../components/ErrorOverlay";
 import Shimmer from "../components/Shimmer";
 
 function Home2() {
+    const resumingRecipeSave = useRef(!!readPendingRecipeSave());
     const navigate = useNavigate();
     const { recipeData, searchRecipe, loading, error, clearError, cancelRecipeExtraction } = useRecipe();
     const { session, getProfileInitial, loading: userLoading } = useUser();
@@ -57,6 +59,8 @@ function Home2() {
             if (session) {
                 setIsModalOpen(false); // Close modal on successful login
                 if (_event === 'SIGNED_IN') {
+                    // The global save flow restores the exact recipe and return page.
+                    if (resumingRecipeSave.current) return;
                     // Check if we need to return to a specific page after OAuth
                     const returnPath = localStorage.getItem('yeschef_auth_return');
                     if (returnPath) {
@@ -83,7 +87,7 @@ function Home2() {
     // But NOT if we're processing an auth callback (code= or access_token in URL)
     useEffect(() => {
         const isAuthCallback = window.location.search.includes('code=') || window.location.hash.includes('access_token');
-        if (recipeData && !loading && !error && !isAuthCallback) {
+        if (recipeData && !loading && !error && !isAuthCallback && !resumingRecipeSave.current) {
             navigate("/food-overview");
         }
     }, [recipeData, loading, error, navigate]);

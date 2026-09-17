@@ -6,6 +6,8 @@ import { useModal } from '../context/ModalContext';
 import { useUser } from '../context/UserContext';
 import { useVoice } from '../context/VoiceContext';
 import { supabase } from '../lib/supabase';
+import useRecipeSave from '../hooks/useRecipeSave';
+import { clearPendingRecipeSave } from '../lib/pendingRecipeSave';
 import '../index.css';
 import './FoodO.css';
 import NewNavbar from "../NewUI/NewNavbar";
@@ -18,38 +20,19 @@ import Footer from "../components/Footer";
 function FoodOverview() {
     const navigate = useNavigate();
     const { recipeData, getDisplayName, clearRecipe, originalQuery } = useRecipe();
-    const { saveRecipe, unsaveRecipe, isRecipeSaved, getSavedRecipeId, session } = useSavedRecipes();
+    const { unsaveRecipe, isRecipeSaved, getSavedRecipeId, session } = useSavedRecipes();
     const { openUnsaveConfirmModal } = useModal();
-    const { getProfileInitial, refreshProfile, isPro, loading: userLoading } = useUser();
+    const { getProfileInitial, isPro, loading: userLoading } = useUser();
     const { stopVoiceMode } = useVoice();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState('signup');
     const [authLoading, setAuthLoading] = useState(false);
+    const [authLinkSent, setAuthLinkSent] = useState(false);
     const [authMessage, setAuthMessage] = useState(null);
 
     // Check if current recipe is saved
     const recipeSaved = isRecipeSaved(recipeData);
-
-    // Handle save recipe
-    const handleSaveRecipe = async () => {
-        if (!session) {
-            // User not logged in, prompt to sign in
-            openSignUpModal();
-            return;
-        }
-
-        try {
-            await saveRecipe(recipeData, originalQuery, getDisplayName());
-            refreshProfile(); // Update credit balance
-        } catch (err) {
-            if (err.message === 'INSUFFICIENT_CREDITS') {
-                navigate('/plans', { state: { from: '/food-overview' } });
-                return;
-            }
-            console.error('Error saving recipe:', err);
-        }
-    };
 
     // Handle unsave recipe (opens confirmation modal)
     const handleUnsaveRecipe = () => {
@@ -84,7 +67,21 @@ function FoodOverview() {
         setIsModalOpen(true);
     };
 
+    const { handleSaveRecipe, saving } = useRecipeSave({
+        recipeData, originalQuery, displayName: getDisplayName(),
+        returnPath: '/food-overview', openSignIn: openSignInModal,
+    });
+
+    useEffect(() => {
+        if (session) setIsModalOpen(false);
+    }, [session]);
+
     const closeModal = () => {
+        // Closing before submitting cancels Save; an emailed link must still resume it.
+        if (!authLinkSent) {
+            clearPendingRecipeSave();
+            localStorage.removeItem('yeschef_auth_return');
+        }
         setIsModalOpen(false);
         setAuthMessage(null);
     };
@@ -113,6 +110,7 @@ function FoodOverview() {
                 setAuthMessage(`Error: ${error.message}`);
             }
         } else {
+            setAuthLinkSent(true);
             setAuthMessage('Check your email for the magic link!');
         }
         setAuthLoading(false);
@@ -171,7 +169,7 @@ function FoodOverview() {
         } else {
             return {
                 title: "Welcome back!",
-                subtitle: "Sign in to access your saved recipes",
+                subtitle: "Sign in to save your recipe",
                 content: (
                     <div style={{width: "100%"}}>
                         <form onSubmit={(e) => {
@@ -250,13 +248,14 @@ function FoodOverview() {
         <div className="page">
             <NewNavbar 
                 showCloseButton={true}
-                showCreditsButton={!userLoading && !!session}
+                showCreditsButton={!userLoading}
                 credits={Math.max(1, Array.isArray(recipe?.steps) ? recipe.steps.length : 1)}
                 isPro={isPro}
                 showProfileButton={!userLoading && !!session}
                 profileInitial={getProfileInitial()}
                 showAuthButtons={!userLoading && !session}
-                isRecipeSaved={recipeSaved}
+                isRecipeSaved={!!session && recipeSaved}
+                isSaving={saving}
                 onSaveRecipe={handleSaveRecipe}
                 onUnsaveRecipe={handleUnsaveRecipe}
                 onCloseClick={() => {
