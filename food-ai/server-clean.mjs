@@ -135,12 +135,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Clear recipe cache (useful for debugging)
+// Clear only the in-memory cache; durable recipes remain available.
 app.post('/api/clear-cache', (req, res) => {
   const cleared = clearRecipeCache();
   res.json({
     success: true,
-    message: `Cleared ${cleared} cached recipes`,
+    message: `Cleared ${cleared} in-memory recipes; persistent cache retained`,
     timestamp: new Date().toISOString()
   });
 });

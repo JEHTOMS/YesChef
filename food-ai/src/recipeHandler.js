@@ -3,6 +3,8 @@ import { socialMediaHandler, isSocialMediaUrl } from './socialMediaHandler.js';
 import { OpenAI } from 'openai';
 import { OPENAI_CONFIG } from './config.js';
 import { createClient } from '@supabase/supabase-js';
+import { createRecipeCache } from './recipeCache.js';
+import { recipeCacheStorage } from './recipeCacheStorage.js';
 
 // Add fetch polyfill
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
@@ -62,59 +64,15 @@ async function uploadThumbnail(tempUrl, fileName) {
   }
 }
 
-// Simple in-memory cache to reduce OpenAI API calls
-const recipeCache = new Map();
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (reduced from 1 hour)
+const recipeCache = createRecipeCache({ storage: recipeCacheStorage });
 
-function getCacheKey(videoUrl, recipeName) {
-  // Create a more specific cache key including the video ID if possible
-  if (videoUrl) {
-    // Extract video ID from various URL formats
-    const videoIdMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\s?]+)/);
-    if (videoIdMatch) {
-      return `yt:${videoIdMatch[1]}`;
-    }
-    // For other URLs, use the full URL
-    return `url:${videoUrl}`;
-  }
-  if (recipeName) {
-    return `name:${recipeName.toLowerCase().trim()}`;
-  }
-  return '';
-}
-
-function getCachedRecipe(key) {
-  if (!key) return null;
-  const cached = recipeCache.get(key);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log(`✅ Returning cached recipe for key: ${key}`);
-    return cached.data;
-  }
-  // Clean up expired cache entry
-  if (cached) {
-    console.log(`🗑️ Removing expired cache entry for key: ${key}`);
-    recipeCache.delete(key);
-  }
-  return null;
-}
-
-function setCachedRecipe(key, data) {
-  if (!key) return;
-  console.log(`💾 Caching recipe for key: ${key}`);
-  recipeCache.set(key, { data, timestamp: Date.now() });
-  // Limit cache size
-  if (recipeCache.size > 100) {
-    const firstKey = recipeCache.keys().next().value;
-    recipeCache.delete(firstKey);
-  }
-}
-
-// Clear all cached recipes (useful for debugging/deployment)
+// Debug endpoint clears the local tier; persistent recipes survive server restarts.
 export function clearRecipeCache() {
-  const size = recipeCache.size;
-  recipeCache.clear();
-  console.log(`🧹 Cleared ${size} cached recipes`);
-  return size;
+  return recipeCache.clearMemory();
+}
+
+export function recipeHandler(requestData) {
+  return recipeCache.run(requestData, () => generateRecipe(requestData));
 }
 
 // Enhanced error logging helper
@@ -290,20 +248,9 @@ Be strict - only return isFood: false with high confidence (>0.8) if you're abso
   }
 }
 
-export async function recipeHandler(requestData) {
+async function generateRecipe(requestData) {
   try {
     console.log('Recipe handler received data:', JSON.stringify(requestData, null, 2));
-    
-    // Check cache first
-    const cacheKey = getCacheKey(requestData.videoInput, requestData.recipeName);
-    const cached = getCachedRecipe(cacheKey);
-    if (cached) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: true, data: cached, fromCache: true }),
-      };
-    }
     
     // Validate API keys and log issues
     const apiKeyIssues = validateApiKeys();
@@ -383,12 +330,14 @@ export async function recipeHandler(requestData) {
     if (isSocialMediaUrl(youtubeUrl)) {
       console.log('Detected social media URL, using VidNavigator API');
       captionResponse = await socialMediaHandler({
-        videoInput: youtubeUrl
+        videoInput: youtubeUrl,
+        lang: requestData.lang || 'en'
       });
     } else {
       console.log('Detected YouTube URL, using YouTube transcript API');
       captionResponse = await captionsHandler({
-        videoInput: youtubeUrl
+        videoInput: youtubeUrl,
+        lang: requestData.lang || 'en'
       });
     }
 
@@ -396,7 +345,7 @@ export async function recipeHandler(requestData) {
     if (!captionData.success) {
       console.error('Caption extraction failed:', captionData.error);
       return {
-        statusCode: 400,
+        statusCode: captionResponse.statusCode || 500,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           success: false, 
@@ -490,9 +439,6 @@ export async function recipeHandler(requestData) {
         thumbnail: stableThumbnail || null,
         recipe: { ...recipeFromTranscript, image: imageUrl }
       };
-      
-      // Cache the result
-      setCachedRecipe(cacheKey, resultData);
       
       return {
         statusCode: 200,
