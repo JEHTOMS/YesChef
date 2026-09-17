@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "if [ -d food-ai ]; then cd food-ai; fi && npm ci --omit=dev"
+    "buildCommand": "if [ -d food-ai ]; then cd food-ai && npm ci --omit=dev; fi && node --check server-clean.mjs"
   },
   "deploy": {
     "startCommand": "if [ -d food-ai ]; then cd food-ai; fi && exec node server-clean.mjs",

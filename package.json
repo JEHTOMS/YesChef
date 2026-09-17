@@ -10,7 +10,7 @@
     "dev": "cd food-ai && node server-clean.mjs"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "22.x"
   },
   "dependencies": {
     "dotenv": "^17.2.2"
