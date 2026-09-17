@@ -24,11 +24,10 @@ jobs:
       working-directory: ./food-ai
       run: npm ci
     
-    # Skip tests for now - focus on deployment first
-    # - name: Run tests
-    #   working-directory: ./food-ai
-    #   run: npm test -- --coverage --watchAll=false
-    
+    - name: Test recipe caching and provider recovery
+      working-directory: ./food-ai
+      run: node --experimental-test-module-mocks --test tests/*.test.mjs
+
     - name: Build application
       working-directory: ./food-ai
       run: npm run build

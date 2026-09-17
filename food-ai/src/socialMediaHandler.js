@@ -2,6 +2,7 @@
 // Supports Instagram, TikTok, Facebook, Twitter/X and other social platforms
 
 import { VidNavigatorClient, VidNavigatorError } from 'vidnavigator';
+import { withProviderRetry, providerStatus, isTemporaryProviderError } from './providerRetry.js';
 
 const socialMediaHandler = async (body) => {
   try {
@@ -53,7 +54,9 @@ const socialMediaHandler = async (body) => {
     // Provide user-friendly error messages
     let errorMessage = error.message || 'Failed to fetch video transcript';
     
-    if (error instanceof VidNavigatorError) {
+    if (isTemporaryProviderError(error)) {
+      errorMessage = 'The video service is temporarily unavailable. Please try this link again in a few minutes.';
+    } else if (error instanceof VidNavigatorError) {
       errorMessage = `VidNavigator API error: ${error.message}`;
     } else if (error.message.includes('private') || error.message.includes('unavailable')) {
       errorMessage = 'This video is private or unavailable. Please use a public video URL.';
@@ -66,7 +69,7 @@ const socialMediaHandler = async (body) => {
     }
     
     return {
-      statusCode: error.statusCode || 500,
+      statusCode: isTemporaryProviderError(error) ? 503 : providerStatus(error) || 500,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         success: false,
@@ -139,10 +142,10 @@ const fetchSocialMediaTranscript = async (videoUrl, lang = 'en') => {
     });
 
     // Call the SDK to transcribe the video
-    const { video_info, transcript } = await client.transcribeVideo({
+    const { video_info, transcript } = await withProviderRetry(() => client.transcribeVideo({
       video_url: videoUrl,
       language: lang
-    });
+    }));
 
     console.log(`✅ VidNavigator success: ${transcript.length} transcript segments`);
     console.log('Video Title:', video_info.title);
