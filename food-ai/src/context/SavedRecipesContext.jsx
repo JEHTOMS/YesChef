@@ -18,6 +18,9 @@ export const SavedRecipesProvider = ({ children }) => {
     const [error, setError] = useState(null);
     const [version, setVersion] = useState(0); // Version counter for auto-refresh
     const [session, setSession] = useState(null);
+    const [loadedUserId, setLoadedUserId] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const saveInFlight = useRef(null);
 
     // Snackbar state for undo after unsave
     const [snackbar, setSnackbar] = useState(null); // { message, undoData, buttonText, action }
@@ -51,6 +54,7 @@ export const SavedRecipesProvider = ({ children }) => {
             if (!session) {
                 // Clear saved recipes when user logs out
                 setSavedRecipes([]);
+                setLoadedUserId(null);
             }
         });
 
@@ -81,6 +85,7 @@ export const SavedRecipesProvider = ({ children }) => {
             setError(err.message);
         } finally {
             setLoading(false);
+            setLoadedUserId(session.user.id);
         }
     }, [session?.user?.id]);
 
@@ -90,47 +95,62 @@ export const SavedRecipesProvider = ({ children }) => {
     }, [fetchSavedRecipes, version]);
 
     // Save a recipe via backend (handles credit deduction server-side)
-    const saveRecipe = async (recipeData, originalQuery, displayName) => {
+    const saveRecipe = useCallback(async (recipeData, originalQuery, displayName) => {
         if (!session?.user?.id) {
             throw new Error('Must be logged in to save recipes');
         }
+        if (saveInFlight.current) return saveInFlight.current;
+        setSaving(true);
+        const request = (async () => {
+            try {
+                const response = await fetch(API_ENDPOINTS.RECIPE_SAVE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: session.user.id,
+                        recipeData,
+                        originalQuery,
+                        displayName,
+                    }),
+                });
 
-        try {
-            const response = await fetch(API_ENDPOINTS.RECIPE_SAVE, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: session.user.id,
-                    recipeData,
-                    originalQuery,
-                    displayName,
-                }),
-            });
+                const result = await response.json();
 
-            const result = await response.json();
-
-            if (!response.ok) {
-                if (result.needsUpgrade) {
-                    const err = new Error('INSUFFICIENT_CREDITS');
-                    err.creditsRequired = result.creditsRequired;
-                    err.currentCredits = result.credits;
-                    throw err;
+                if (!response.ok) {
+                    if (result.needsUpgrade) {
+                        const err = new Error('INSUFFICIENT_CREDITS');
+                        err.creditsRequired = result.creditsRequired;
+                        err.currentCredits = result.credits;
+                        throw err;
+                    }
+                    if (result.error === 'Recipe already saved') {
+                        setVersion(v => v + 1);
+                        showSnackbar('Recipe already saved', null, { buttonText: 'View all', action: 'viewSaved' });
+                        return null;
+                    }
+                    throw new Error(result.error || 'Failed to save recipe');
                 }
-                if (result.error === 'Recipe already saved') {
-                    throw new Error('Recipe already saved');
+
+                // Increment version to trigger refresh
+                if (result.recipe) {
+                    setSavedRecipes(recipes => [result.recipe, ...recipes.filter(recipe => recipe.id !== result.recipe.id)]);
                 }
-                throw new Error(result.error || 'Failed to save recipe');
+                setVersion(v => v + 1);
+                showSnackbar('Added to saved recipes', null, { buttonText: 'View all', action: 'viewSaved' });
+                return result.recipe;
+            } catch (err) {
+                console.error('Error saving recipe:', err);
+                throw err;
             }
-
-            // Increment version to trigger refresh
-            setVersion(v => v + 1);
-            showSnackbar('Added to saved recipes', null, { buttonText: 'View all', action: 'viewSaved' });
-            return result.recipe;
-        } catch (err) {
-            console.error('Error saving recipe:', err);
-            throw err;
+        })();
+        saveInFlight.current = request;
+        try {
+            return await request;
+        } finally {
+            saveInFlight.current = null;
+            setSaving(false);
         }
-    };
+    }, [session?.user?.id, showSnackbar]);
 
     // Unsave (delete) a recipe
     const unsaveRecipe = async (recipeId) => {
@@ -235,6 +255,9 @@ export const SavedRecipesProvider = ({ children }) => {
         loading,
         error,
         session,
+        ready: !!session?.user?.id && loadedUserId === session.user.id,
+        saving,
+        showSnackbar,
         saveRecipe,
         unsaveRecipe,
         isRecipeSaved,

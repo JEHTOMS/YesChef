@@ -18,6 +18,7 @@ import PrivacyPolicy from './NewUI/PrivacyPolicy.jsx';
 import TermsOfService from './NewUI/TermsOfService.jsx';
 import UnsaveConfirmModal from './NewUI/UnsaveConfirmModal.jsx';
 import Snackbar from './components/Snackbar.jsx';
+import PendingRecipeSave from './components/PendingRecipeSave.jsx';
 import CookieConsent from './components/CookieConsent.jsx';
 import FloatingAudioContainer from './components/FloatingAudioContainer.jsx';
 import './App.css';
@@ -48,6 +49,7 @@ function App() {
                 {/* Global modals */}
                 <UnsaveConfirmModal />
                 <Snackbar />
+                <PendingRecipeSave />
                 <FloatingAudioContainer />
                 <CookieConsent />
               </div>

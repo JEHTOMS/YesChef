@@ -6,6 +6,8 @@ import { useModal } from '../context/ModalContext';
 import { useUser } from '../context/UserContext';
 import { LocationService } from '../services/locationService';
 import { supabase } from '../lib/supabase';
+import useRecipeSave from '../hooks/useRecipeSave';
+import { clearPendingRecipeSave } from '../lib/pendingRecipeSave';
 import './Home.css';
 import '../index.css';
 import NewNavbar from "../NewUI/NewNavbar";
@@ -21,15 +23,16 @@ import { useVoice } from "../context/VoiceContext";
 function FoodInformation() {
     const navigate = useNavigate();
     const { recipeData, subtitleData, getServingMultiplier, getDisplayName, getVideoDuration, originalQuery } = useRecipe();
-    const { saveRecipe, unsaveRecipe, isRecipeSaved, getSavedRecipeId } = useSavedRecipes();
+    const { unsaveRecipe, isRecipeSaved, getSavedRecipeId } = useSavedRecipes();
     const { openUnsaveConfirmModal } = useModal();
-    const { session, getProfileInitial, refreshProfile, isPro, loading: userLoading } = useUser();
+    const { session, getProfileInitial, isPro, loading: userLoading } = useUser();
     const [activeTab, setActiveTab] = useState(() => {
         return sessionStorage.getItem('yeschef_active_tab') || 'ingredients';
     });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState('signup');
     const [authLoading, setAuthLoading] = useState(false);
+    const [authLinkSent, setAuthLinkSent] = useState(false);
     const [authMessage, setAuthMessage] = useState(null);
     const [isStoresModalOpen, setIsStoresModalOpen] = useState(false);
     const [isModalClosing, setIsModalClosing] = useState(false);
@@ -45,24 +48,6 @@ function FoodInformation() {
 
     // Check if current recipe is saved
     const recipeSaved = isRecipeSaved(recipeData);
-
-    // Handle save recipe
-    const handleSaveRecipe = async () => {
-        if (!session) {
-            openSignUpModal();
-            return;
-        }
-        try {
-            await saveRecipe(recipeData, originalQuery, getDisplayName());
-            refreshProfile(); // Update credit balance
-        } catch (err) {
-            if (err.message === 'INSUFFICIENT_CREDITS') {
-                navigate('/plans', { state: { from: '/food-information' } });
-                return;
-            }
-            console.error('Error saving recipe:', err);
-        }
-    };
 
     // Handle unsave recipe
     const handleUnsaveRecipe = () => {
@@ -98,7 +83,21 @@ function FoodInformation() {
         setIsModalOpen(true);
     };
 
+    const { handleSaveRecipe, saving } = useRecipeSave({
+        recipeData, originalQuery, displayName: getDisplayName(),
+        returnPath: '/food-information', openSignIn: openSignInModal,
+    });
+
+    useEffect(() => {
+        if (session) setIsModalOpen(false);
+    }, [session]);
+
     const closeModal = () => {
+        // Closing before submitting cancels Save; an emailed link must still resume it.
+        if (!authLinkSent) {
+            clearPendingRecipeSave();
+            localStorage.removeItem('yeschef_auth_return');
+        }
         setIsModalOpen(false);
         setAuthMessage(null);
     };
@@ -127,6 +126,7 @@ function FoodInformation() {
                 setAuthMessage(`Error: ${error.message}`);
             }
         } else {
+            setAuthLinkSent(true);
             setAuthMessage('Check your email for the magic link!');
         }
         setAuthLoading(false);
@@ -185,7 +185,7 @@ function FoodInformation() {
         } else {
             return {
                 title: "Welcome back!",
-                subtitle: "Sign in to access your saved recipes",
+                subtitle: "Sign in to save your recipe",
                 content: (
                     <div style={{width: "100%"}}>
                         <form onSubmit={(e) => {
@@ -427,13 +427,14 @@ function FoodInformation() {
                     showBackButton={true}
                     showFoodName={true}
                     foodName={getDisplayName()}
-                    showCreditsButton={!userLoading && !!session}
+                    showCreditsButton={!userLoading}
                     credits={Math.max(1, Array.isArray(recipe?.steps) ? recipe.steps.length : 1)}
                     isPro={isPro}
                     showProfileButton={!userLoading && !!session}
                     profileInitial={getProfileInitial()}
                     showAuthButtons={!userLoading && !session}
-                    isRecipeSaved={recipeSaved}
+                    isRecipeSaved={!!session && recipeSaved}
+                isSaving={saving}
                     onSaveRecipe={handleSaveRecipe}
                     onUnsaveRecipe={handleUnsaveRecipe}
                     onBackClick={() => navigate('/food-overview')}

@@ -20,6 +20,7 @@ export const UserProvider = ({ children }) => {
     const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
     const [currentPeriodEnd, setCurrentPeriodEnd] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [profileUserId, setProfileUserId] = useState(null);
 
     const isPro = subscriptionStatus === 'active';
 
@@ -126,9 +127,7 @@ export const UserProvider = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
-            if (session?.user) {
-                fetchProfile(session.user.id);
-            } else {
+            if (!session?.user) {
                 setDisplayName('');
                 setCredits(null);
                 setSubscriptionStatus('free');
@@ -146,7 +145,19 @@ export const UserProvider = ({ children }) => {
         });
 
         return () => subscription.unsubscribe();
-    }, [fetchProfile]);
+    }, []);
+
+    // Complete profile creation outside the Supabase auth callback before resuming a save.
+    useEffect(() => {
+        let active = true;
+        setProfileUserId(null);
+        if (session?.user?.id) {
+            fetchProfile(session.user.id)
+                .then(() => { if (active) setProfileUserId(session.user.id); })
+                .catch(error => console.error('Error loading profile:', error));
+        }
+        return () => { active = false; };
+    }, [session?.user?.id, fetchProfile]);
 
     const updateDisplayName = async (newName) => {
         if (!session?.user?.id) return;
@@ -172,6 +183,7 @@ export const UserProvider = ({ children }) => {
     return (
         <UserContext.Provider value={{
             session,
+            profileReady: !!session?.user?.id && profileUserId === session.user.id,
             displayName,
             credits,
             subscriptionStatus,
