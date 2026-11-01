@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import OpenAI from 'openai';
+import { chatOptions, OPENAI_CLIENT_OPTIONS, callOpenAIWithRetry, publicAIError } from './src/openaiPolicy.js';
 // Stripe and Supabase admin are dynamically imported to prevent server crashes
 // if packages are missing (same pattern as @google-cloud/speech below)
 let Stripe, createClient;
@@ -495,7 +496,7 @@ async function handleConverse(req, res) {
         return res.status(500).json({ error: 'OpenAI API key not configured' });
       }
 
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, ...OPENAI_CLIENT_OPTIONS });
       const currentStepText = steps?.[currentStep]?.text || steps?.[currentStep]?.instruction || '';
       const stepsListStr = (steps || []).map((s, i) => {
         const txt = (s.text || s.instruction || '').substring(0, 200);
@@ -513,15 +514,13 @@ INTENT RULES:
 
 ALL STEPS:\n${stepsListStr}\nCurrent: Step ${currentStep + 1} of ${totalSteps} — "${currentStepText}"`;
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await callOpenAIWithRetry(() => openai.chat.completions.create({
+        ...chatOptions(150, 0.5),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: transcript }
         ],
-        temperature: 0.5,
-        max_tokens: 150
-      });
+      }));
 
       const rawReply = response.choices[0].message.content;
       console.log(`🤖 [GPT] Raw reply: "${rawReply}"`);
@@ -605,8 +604,9 @@ ALL STEPS:\n${stepsListStr}\nCurrent: Step ${currentStep + 1} of ${totalSteps} �
     res.json(result);
 
   } catch (error) {
-    console.error('Converse Error:', error);
-    res.status(500).json({ error: 'Failed to generate response', details: error.message });
+    console.error('Converse Error:', { status: error.status, code: error.code, requestId: error.request_id });
+    const failure = publicAIError(error) || { statusCode: 500, code: 'chat_failed', error: 'Could not answer that question. Please try again.' };
+    res.status(failure.statusCode).json({ error: failure.error, code: failure.code });
   }
 }
 

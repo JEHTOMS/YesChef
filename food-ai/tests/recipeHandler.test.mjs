@@ -7,13 +7,18 @@ delete process.env.GOOGLE_API_KEY;
 delete process.env.SUPABASE_URL;
 let providerCalls = 0, aiCalls = 0, providerFailure = false, shortTranscript = false, lastLanguage;
 const entries = new Map();
+let aiFailure = null;
+const aiRequests = [];
 await mock.module('../src/recipeCacheStorage.js', { namedExports: { recipeCacheStorage: {
   read: async key => entries.get(key), write: async (key, entry) => entries.set(key, entry),
 } } });
 await mock.module('../src/captionsHandler.js', { namedExports: { captionsHandler: async () => assert.fail('unexpected YouTube request') } });
 await mock.module('openai', { namedExports: { OpenAI: class {
-  chat = { completions: { create: async ({ messages }) => {
+  chat = { completions: { create: async (request) => {
+    const { messages } = request;
+    aiRequests.push(request);
     aiCalls++;
+    if (aiFailure) throw aiFailure;
     const value = messages[0].content.includes('Analyze if the following input')
       ? { isFood: true, confidence: 1 }
       : { title: 'Pasta', servings: 2, ingredients: [{ item: 'pasta', amount: '200g' }], steps: [{ instruction: 'Boil pasta for 10 minutes.' }] };
@@ -69,4 +74,32 @@ test('provider 500 returns friendly 503 after one retry; a later attempt can rec
   assert.equal(providerCalls - before, 2);
   providerFailure = false;
   assert.equal(parse(await recipeHandler(input)).success, true);
+});
+
+
+test('quota errors retain their category through recipe extraction and validation', async () => {
+  providerFailure = false;
+  shortTranscript = false;
+  aiFailure = Object.assign(new Error('private account billing details'), { status: 429, code: 'insufficient_quota', request_id: 'req_test' });
+  try {
+    for (const input of [{ videoInput: 'https://x.com/chef/status/444' }, { recipeName: 'quota test', validateOnly: true }]) {
+      const before = aiCalls;
+      const result = await recipeHandler(input);
+      assert.equal(result.statusCode, 503);
+      assert.equal(parse(result).code, 'ai_quota_exceeded');
+      assert.equal(parse(result).requestId, 'req_test');
+      assert.doesNotMatch(result.body, /private account billing details|Too many requests/);
+      assert.equal(aiCalls - before, 1);
+    }
+  } finally { aiFailure = null; }
+});
+
+test('all recipe and validation calls use GPT-6 Luna compatible requests', () => {
+  assert.ok(aiRequests.length > 0);
+  for (const request of aiRequests) {
+    assert.equal(request.model, 'gpt-6-luna');
+    assert.equal(request.reasoning_effort, 'none');
+    assert.ok(request.max_completion_tokens > 0);
+    assert.equal(request.max_tokens, undefined);
+  }
 });

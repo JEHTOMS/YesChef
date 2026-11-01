@@ -464,7 +464,7 @@ function Home2() {
             {loading && (
                 <LoadingOverlay 
                     primaryMessage="Extracting recipe..." 
-                    secondaryMessage={error ? "Processing failed - rate limit possible" : "Estimated time: 15 to 25 seconds"}
+                    secondaryMessage={error ? "Processing failed" : "Estimated time: 15 to 25 seconds"}
                     onCancel={cancelRecipeExtraction}
                 />
             )}
@@ -474,7 +474,7 @@ function Home2() {
                     secondaryMessage={
                         error.includes("doesn't appear to be food-related") 
                             ? 'Try a dish, ingredient, cuisine, or paste a cooking video link.' 
-                            : error.includes("Too many requests") || error.includes("try again later")
+                            : error.includes("Too many requests")
                                 ? 'Please wait a few minutes before trying again.'
                                 : 'Please try again or contact support if the issue persists.'
                     }

@@ -125,8 +125,14 @@ export const RecipeProvider = ({ children }) => {
             });
 
             const result = await response.json();
+            if (!response.ok || result.success === false) {
+                const failure = new Error(result.error || 'Could not validate this request. Please try again.');
+                failure.isServiceError = true;
+                throw failure;
+            }
             return result.validation || { isFood: false, confidence: 0 };
         } catch (err) {
+            if (err.isServiceError || err.name === 'AbortError') throw err;
             // If validation fails, assume it might be food to avoid blocking valid requests
             console.warn('Food validation failed:', err);
             return { isFood: true, confidence: 0.5 };
@@ -211,7 +217,7 @@ export const RecipeProvider = ({ children }) => {
             if (err.message.includes('rate limit') || err.message.includes('429')) {
                 userFriendlyError = 'Too many requests at the moment. Please try again later.';
             } else if (err.message.includes('Internal server error')) {
-                userFriendlyError = 'Too many requests at the moment. Please try again later.';
+                userFriendlyError = 'Could not create this recipe. Please try again or contact support.';
             } else if (err.message.includes('network') || err.message.includes('fetch')) {
                 userFriendlyError = 'Network error occurred. Please check your connection and try again.';
             }
