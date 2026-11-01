@@ -1,7 +1,7 @@
 import { captionsHandler } from './captionsHandler.js';
 import { socialMediaHandler, isSocialMediaUrl } from './socialMediaHandler.js';
 import { OpenAI } from 'openai';
-import { OPENAI_CONFIG } from './config.js';
+import { chatOptions, OPENAI_CLIENT_OPTIONS, callOpenAIWithRetry, publicAIError } from './openaiPolicy.js';
 import { createClient } from '@supabase/supabase-js';
 import { createRecipeCache } from './recipeCache.js';
 import { recipeCacheStorage } from './recipeCacheStorage.js';
@@ -78,50 +78,13 @@ export function recipeHandler(requestData) {
 // Enhanced error logging helper
 function logError(context, error, additionalInfo = {}) {
   console.error(`[${context}] Error:`, {
-    message: error.message,
-    stack: error.stack,
+    status: error.status,
+    code: error.code,
+    type: error.type,
+    requestId: error.request_id,
     ...additionalInfo,
     timestamp: new Date().toISOString()
   });
-}
-
-// Rate limiting helper with exponential backoff
-async function callOpenAIWithRetry(openaiFunction, maxRetries = 3, initialDelay = 1000) {
-  let lastError;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`[OpenAI] Attempt ${attempt}/${maxRetries}`);
-      return await openaiFunction();
-    } catch (error) {
-      lastError = error;
-      
-      // Check if it's a rate limit error
-      if (error.status === 429 || error.message.includes('rate limit') || error.message.includes('quota')) {
-        const delay = initialDelay * Math.pow(2, attempt - 1); // Exponential backoff
-        console.warn(`[OpenAI] Rate limit hit, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
-        
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-      }
-      
-      // For non-rate-limit errors, don't retry
-      if (attempt === 1 && !error.message.includes('rate limit')) {
-        console.error(`[OpenAI] Non-retryable error:`, error.message);
-        throw error;
-      }
-      
-      // Last attempt failed
-      if (attempt === maxRetries) {
-        console.error(`[OpenAI] All ${maxRetries} attempts failed`);
-        throw lastError;
-      }
-    }
-  }
-  
-  throw lastError;
 }
 
 // API key validation helper
@@ -194,7 +157,7 @@ async function validateFoodInput(query) {
   try {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      ...OPENAI_CONFIG
+      ...OPENAI_CLIENT_OPTIONS
     });
 
     const prompt = `Analyze if the following input is food, cooking, or recipe-related. Return only a JSON object with "isFood" (boolean) and "confidence" (0-1).
@@ -216,10 +179,9 @@ Be strict - only return isFood: false with high confidence (>0.8) if you're abso
 
     const response = await callOpenAIWithRetry(async () => {
       return await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        ...chatOptions(100, 0.1),
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 100,
+        response_format: { type: 'json_object' },
       });
     });
 
@@ -242,7 +204,8 @@ Be strict - only return isFood: false with high confidence (>0.8) if you're abso
     return { isFood: true, confidence: 0.5 };
     
   } catch (error) {
-    console.error('Food validation error:', error);
+    console.error('Food validation error:', { status: error.status, code: error.code, requestId: error.request_id });
+    if (publicAIError(error)) throw error;
     // Default to allowing the request if validation fails
     return { isFood: true, confidence: 0.5 };
   }
@@ -502,10 +465,14 @@ async function generateRecipe(requestData) {
     });
     
     // Provide more specific error messages based on error type
-    let errorMessage = 'Too many requests at the moment. Please try again later.';
+    let errorMessage = 'Could not create this recipe. Please try again or contact support.';
     let errorCode = 500;
     
-    if (error.message.includes('API key') || error.message.includes('401') || error.message.includes('authentication')) {
+    const aiError = publicAIError(error);
+    if (aiError) {
+      errorMessage = aiError.error;
+      errorCode = aiError.statusCode;
+    } else if (error.message.includes('API key') || error.message.includes('401') || error.message.includes('authentication')) {
       errorMessage = 'API authentication error - please check your API keys';
       errorCode = 401;
     } else if (error.message.includes('quota') || error.message.includes('rate limit') || error.message.includes('429')) {
@@ -528,16 +495,16 @@ async function generateRecipe(requestData) {
       body: JSON.stringify({ 
         success: false, 
         error: errorMessage,
-        details: error.message,
+        code: aiError?.code || 'recipe_failed',
         timestamp: new Date().toISOString(),
-        helpUrl: 'Please ensure all required API keys are configured in your .env file'
+        requestId: error.request_id
       }),
     };
   }
 }
 
 async function extractRecipeFromTranscript(content, videoTitle, contentSource = 'transcript') {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, ...OPENAI_CLIENT_OPTIONS });
   
   const sourceContext = contentSource === 'description' 
     ? 'This is from the video caption/description which often contains the full recipe with ingredients and steps.'
@@ -609,10 +576,8 @@ IMPORTANT for title: Extract just the core food name from "${videoTitle}", remov
     console.log(`[OpenAI] Starting recipe extraction from ${contentSource} (${content.length} chars)`);
     const response = await callOpenAIWithRetry(async () => {
       return await openai.chat.completions.create({
-        model: OPENAI_CONFIG.MODEL,
+        ...chatOptions(),
         messages: [{ role: 'user', content: prompt }],
-        temperature: OPENAI_CONFIG.TEMPERATURE,
-        max_tokens: OPENAI_CONFIG.MAX_TOKENS,
         response_format: { type: 'json_object' }
       });
     });
@@ -633,18 +598,13 @@ IMPORTANT for title: Extract just the core food name from "${videoTitle}", remov
   } catch (error) {
     logError('OPENAI_RECIPE_EXTRACTION', error, { contentLength: content.length, contentSource });
     
-    // Provide more specific error message for rate limits
-    if (error.status === 429 || error.message.includes('rate limit')) {
-      throw new Error('Too many requests at the moment. Please try again later.');
-    }
-    
-    throw new Error(`Recipe extraction failed: ${error.message}`);
+    throw error;
   }
 }
 
 async function generateRecipeFromTitle(videoTitle) {
   // Generate a recipe from video title using OpenAI with zero hallucination
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, ...OPENAI_CLIENT_OPTIONS });
   
   const prompt = `Based on this video title "${videoTitle}", generate a realistic cooking recipe.
 
@@ -700,10 +660,8 @@ Make it realistic and detailed. Estimate calories per serving based on typical i
     console.log(`[OpenAI] Generating recipe from title: "${videoTitle}"`);
     const response = await callOpenAIWithRetry(async () => {
       return await openai.chat.completions.create({
-        model: OPENAI_CONFIG.MODEL,
+        ...chatOptions(),
         messages: [{ role: 'user', content: prompt }],
-        temperature: OPENAI_CONFIG.TEMPERATURE,
-        max_tokens: OPENAI_CONFIG.MAX_TOKENS,
         response_format: { type: 'json_object' }
       });
     });
@@ -714,16 +672,12 @@ Make it realistic and detailed. Estimate calories per serving based on typical i
   } catch (error) {
     logError('OPENAI_RECIPE_FROM_TITLE', error, { videoTitle });
     
-    if (error.status === 429 || error.message.includes('rate limit')) {
-      throw new Error('Too many requests at the moment. Please try again later.');
-    }
-    
-    throw new Error(`Recipe generation failed: ${error.message}`);
+    throw error;
   }
 }
 
 async function generateRecipeFromQuery(query) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, ...OPENAI_CLIENT_OPTIONS });
   const prompt = `You are a precise recipe creation AI. Create a realistic, well-structured recipe for "${query}".
 
 IMPORTANT: Return servings and calories as plain numbers (not strings), like: "servings": 2, "calories": 350. Extract the actual serving size from the content — do NOT default to 4.
@@ -763,10 +717,8 @@ Estimate calories per serving based on typical ingredients and portions for this
   console.log(`[OpenAI] Generating recipe from query: "${query}"`);
   const response = await callOpenAIWithRetry(async () => {
     return await openai.chat.completions.create({
-      model: OPENAI_CONFIG.MODEL,
+      ...chatOptions(),
       messages: [{ role: 'user', content: prompt }],
-      temperature: OPENAI_CONFIG.TEMPERATURE,
-      max_tokens: OPENAI_CONFIG.MAX_TOKENS,
       response_format: { type: 'json_object' }
     });
   });

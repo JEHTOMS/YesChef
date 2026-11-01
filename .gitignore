@@ -82,3 +82,8 @@ jspm_packages/
 .tern-port
 .vercel
 .env*.local
+
+# Keep deployment credentials out of source control.
+.env.*
+!.env.example
+!.env.production.template
