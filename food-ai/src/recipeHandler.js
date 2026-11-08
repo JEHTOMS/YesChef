@@ -411,6 +411,18 @@ async function generateRecipe(requestData) {
           data: resultData
         }),
       };
+    } else if (platform && platform !== 'YouTube') {
+      // A creator name or short caption cannot establish the video's recipe.
+      // Return a failure instead of inventing a dish from social metadata.
+      return {
+        statusCode: 422,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: false,
+          error: 'This video did not provide enough recipe details to extract. Please try a video with spoken instructions or a detailed recipe caption.',
+          platform,
+        }),
+      };
     } else if (title) {
       // If we have the user's original search query, prefer that over a potentially useless video title
       const isUselessTitle = !title || title.startsWith('Video ') || title.length < 5;

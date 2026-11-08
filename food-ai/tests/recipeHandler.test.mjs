@@ -51,12 +51,22 @@ test('full handler caches transcript results, survives memory clear and skips bo
   assert.deepEqual([providerCalls, aiCalls], before);
 });
 
-test('existing title fallback successes also persist, and validation keeps its own response', async () => {
+test('social videos without recipe content fail without inventing or caching a recipe', async () => {
   shortTranscript = true;
   const input = { videoInput: 'https://x.com/chef/status/222' };
-  assert.equal(parse(await recipeHandler(input)).success, true);
-  clearRecipeCache();
-  assert.equal(parse(await recipeHandler(input)).cacheSource, 'persistent');
+  const before = [providerCalls, aiCalls];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await recipeHandler(input);
+    assert.equal(response.statusCode, 422);
+    assert.equal(parse(response).success, false);
+    assert.match(parse(response).error, /enough recipe details/);
+    assert.equal(parse(response).data, undefined);
+  }
+  assert.deepEqual([providerCalls, aiCalls], [before[0] + 2, before[1]]);
+  shortTranscript = false;
+});
+
+test('validation keeps its own response', async () => {
   await recipeHandler({ recipeName: 'pasta' });
   const result = parse(await recipeHandler({ recipeName: 'pasta', validateOnly: true }));
   assert.equal(result.validation.isFood, true);
