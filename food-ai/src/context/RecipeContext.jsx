@@ -107,8 +107,8 @@ export const RecipeProvider = ({ children }) => {
 
     // Validate if input is food-related using OpenAI
     const validateFoodInput = async (query, signal) => {
-        // Skip validation for YouTube URLs as they're likely recipe videos
-        if (isLikelyYoutube(query)) {
+        // Judge video content after transcription, rather than classifying its URL as food.
+        if (isVideoUrl(query)) {
             return { isFood: true, confidence: 1.0 };
         }
 
@@ -151,8 +151,8 @@ export const RecipeProvider = ({ children }) => {
         setOriginalQuery(query);
 
         try {
-            // First validate if input is food-related (skip for YouTube URLs)
-            if (!isLikelyYoutube(query)) {
+            // Only classify text searches; video URLs go directly to transcription.
+            if (!isVideoUrl(query)) {
                 const validation = await validateFoodInput(query, controller.signal);
                 
                 // High confidence threshold to avoid false positives
@@ -254,7 +254,7 @@ export const RecipeProvider = ({ children }) => {
         if (!val) return false;
         const trimmed = String(val).trim().toLowerCase();
         if (isLikelyYoutube(val)) return true;
-        const socialPlatforms = ['instagram.com', 'instagr.am', 'tiktok.com', 'facebook.com', 'fb.watch', 'fb.com', 'twitter.com', 'x.com', 'vimeo.com', 'dailymotion.com'];
+        const socialPlatforms = ['instagram.com', 'instagr.am', 'tiktok.com', 'facebook.com', 'fb.watch', 'fb.com', 'twitter.com', 'x.com', 'snapchat.com', 'pinterest.com', 'vimeo.com', 'dailymotion.com'];
         return socialPlatforms.some(p => trimmed.includes(p));
     };
 
